@@ -1,5 +1,6 @@
 /* ==========================================================================
    pages-apps-tools.js — Renderers & Handlers for Ứng dụng (6 pages) & Bảo dưỡng (8 pages)
+   Exact VHT Firmware V1302250508 layout & labels
    ========================================================================== */
 
 (function () {
@@ -13,41 +14,65 @@
       .replace(/"/g, "&quot;");
   }
 
+  function swHtml(id, checked, extraAttr) {
+    return `<label class="vht-switch"><input type="checkbox" id="${id}" ${checked ? "checked" : ""} ${extraAttr || ""} /><span class="vht-slider"></span></label>`;
+  }
+
+  function passHtml(id, val, placeholder) {
+    return `
+      <div class="vht-pass-wrap">
+        <input type="password" class="vht-input" id="${id}" value="${esc(val)}" placeholder="${esc(placeholder || "")}" />
+        <button type="button" class="vht-pass-eye" data-target="${id}" title="Hiện/Ẩn mật khẩu">👁</button>
+      </div>
+    `;
+  }
+
+  function bindPassEyes() {
+    document.querySelectorAll(".vht-pass-eye").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const inp = document.getElementById(btn.getAttribute("data-target"));
+        if (!inp) return;
+        inp.type = inp.type === "password" ? "text" : "password";
+      });
+    });
+  }
+
   // --------------------------------------------------------------------------
   // 12. Ứng dụng -> DMZ (/cgi-bin/apps-dmz.asp)
   // --------------------------------------------------------------------------
   window.RouterPages["apps-dmz"] = {
-    title: "DMZ (Demilitarized Zone)",
+    title: "Thiết lập DMZ",
     group: "Ứng dụng",
     cgi: "/cgi-bin/apps-dmz.asp",
     render: function () {
       const dmz = window.SimState.apps.dmz;
       return `
-        <div class="vht-notice warn">
-          <strong>Cảnh báo bảo mật:</strong> Khác với <em>Port Forwarding</em> chỉ mở đúng cổng chỉ định, bật <strong>DMZ</strong> sẽ phơi bày toàn bộ <strong>65.535 cổng</strong> từ ngoài Internet đẩy thẳng vào máy chủ LAN được điền bên dưới. Với mạng gia đình, luôn khuyến nghị để <strong>Tắt</strong>.
-        </div>
-
-        <div class="vht-card">
-          <div class="vht-card-header">Thiết lập máy chủ vùng phi quân sự (DMZ Host)</div>
-          <div class="vht-card-body">
+        <div class="vht-widget">
+          <header class="vht-widget-title">Thiết lập DMZ</header>
+          <div class="vht-card">
             <table class="form-table">
               <tr>
-                <th>Kích hoạt DMZ:</th>
-                <td><label class="check-item"><input type="checkbox" id="dmz-en" ${dmz.enabled ? "checked" : ""} /> <strong>Kích hoạt</strong></label></td>
-              </tr>
-              <tr>
-                <th>Giao diện WAN:</th>
-                <td><select class="vht-select" id="dmz-wan"><option value="1_INTERNET_R_VID_35">1_INTERNET_R_VID_35</option></select></td>
-              </tr>
-              <tr>
-                <th>Địa chỉ LAN (DMZ Host IP):</th>
+                <th>Tên giao diện WAN</th>
                 <td>
-                  <input type="text" class="vht-input med" id="dmz-ip" value="${esc(dmz.hostIp)}" placeholder="192.168.1.150" />
+                  <select class="vht-select" id="dmz-wan">
+                    <option value="1_INTERNET_R_VID_35">1_INTERNET_R_VID_35</option>
+                  </select>
+                </td>
+              </tr>
+              <tr>
+                <th>Kích hoạt</th>
+                <td>${swHtml("dmz-en", dmz.enabled)}</td>
+              </tr>
+              <tr>
+                <th>Địa chỉ LAN</th>
+                <td>
+                  <input type="text" class="vht-input" id="dmz-ip" value="${esc(dmz.hostIp)}" placeholder="0.0.0.0" />
                 </td>
               </tr>
             </table>
-            <div class="btn-row">
-              <button class="btn-vht" id="dmz-btn-apply">ÁP DỤNG</button>
+            <div class="btn-row center" style="gap:14px;">
+              <button type="button" class="btn-vht" id="dmz-btn-apply">ÁP DỤNG</button>
+              <button type="button" class="btn-vht secondary" id="dmz-btn-cancel">HỦY</button>
             </div>
           </div>
         </div>
@@ -66,6 +91,9 @@
         window.SimEngine.addLog("[DMZ] Trạng thái DMZ: " + (en ? "Bật -> " + ip : "Tắt") + ".");
         window.RouterApp.applyWithFeedback("Đã lưu cấu hình DMZ!");
       });
+      document.getElementById("dmz-btn-cancel").addEventListener("click", function () {
+        window.RouterApp.renderCurrentPage();
+      });
     }
   };
 
@@ -73,145 +101,224 @@
   // 13. Ứng dụng -> Port Forwarding (/cgi-bin/apps-portforwarding.asp)
   // --------------------------------------------------------------------------
   window.RouterPages["apps-portforwarding"] = {
-    title: "Port Forwarding (NAT Virtual Server)",
+    title: "Thiết lập Port Forwarding",
     group: "Ứng dụng",
     cgi: "/cgi-bin/apps-portforwarding.asp",
     showForm: false,
+    editIndex: -1,
     render: function () {
       const list = window.SimState.apps.portForwarding;
+      const editingItem = this.editIndex >= 0 && list[this.editIndex] ? list[this.editIndex] : null;
       return `
-        <div class="vht-notice">
-          <strong>Port Forwarding:</strong> Mở có chọn lọc một cổng cụ thể từ ngoài Internet (WAN) ánh xạ qua NAT vào đúng một máy chủ nội bộ (Web Server, SSH, FTP, Camera IP, Game Server).
-        </div>
+        <div class="vht-widget">
+          <header class="vht-widget-title">Thiết lập Port Forwarding</header>
+          <div class="vht-card">
+            <table class="form-table" style="margin-bottom:14px;">
+              <tr>
+                <th>Tên giao diện WAN</th>
+                <td><strong>1_INTERNET_R_VID_35</strong></td>
+              </tr>
+            </table>
 
-        <div class="vht-card">
-          <div class="vht-card-header">
-            <span>Danh sách luật mở cổng Port Forwarding</span>
-            <button type="button" class="btn-vht small" id="pf-btn-toggle-add">${this.showForm ? "ĐÓNG KHUNG THÊM" : "THÊM"}</button>
-          </div>
-          <div class="vht-card-body">
             ${
               this.showForm
                 ? `
-            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:14px;margin-bottom:16px;">
+            <div style="border-top:1px solid #f0f0f0;padding-top:16px;margin-bottom:18px;">
               <table class="form-table">
                 <tr>
-                  <th>Kiểu dịch vụ:</th>
+                  <th></th>
                   <td>
                     <div class="check-grid">
-                      <label class="check-item"><input type="radio" name="pf-srv-mode" value="custom" checked /> Tùy chỉnh</label>
-                      <label class="check-item"><input type="radio" name="pf-srv-mode" value="preset" /> Chọn mẫu dịch vụ có sẵn:</label>
-                      <select class="vht-select" id="pf-preset" disabled style="min-width:210px;">
-                        <option value="Web_Server_LAN|TCP|80|8080">HTTP Web Server (Port 80)</option>
-                        <option value="FTP_Server|TCP|21|2121">FTP Server (Port 21)</option>
-                        <option value="Secure_Shell_SSH|TCP|22|2222">Secure Shell Server - SSH (Port 22)</option>
-                        <option value="DNS_Server|TCP/UDP|53|53">Domain Name Server - DNS (Port 53)</option>
-                        <option value="Game_UDP_Server|UDP|27015|27015">Game Voice/UDP Server (Port 27015)</option>
-                      </select>
+                      <label class="check-item"><input type="radio" name="pf-srv-mode" value="custom" checked /> Tùy biến</label>
+                      <label class="check-item"><input type="radio" name="pf-srv-mode" value="preset" /> Chọn Ứng dụng</label>
                     </div>
                   </td>
                 </tr>
-                <tr>
-                  <th>Tên Mapping:</th>
-                  <td><input type="text" class="vht-input" id="pf-name" value="Web_Server_LAN" /></td>
-                </tr>
-                <tr>
-                  <th>Giao thức (Protocol):</th>
+                <tr id="pf-service-row" style="display:none;">
+                  <th>Service Type</th>
                   <td>
-                    <select class="vht-select" id="pf-proto">
-                      <option value="TCP">TCP (Tin cậy cao: Web HTTP/HTTPS, FTP, SSH)</option>
-                      <option value="UDP">UDP (Thời gian thực, độ trễ thấp: Game, Video/VoIP)</option>
-                      <option value="TCP/UDP">TCP/UDP (Cả hai giao thức)</option>
+                    <select class="vht-select" id="pf-preset">
+                      <option value="">Chọn...</option>
+                      <option value="Domain Name Server|TCP/UDP|53|53">Domain Name Server</option>
+                      <option value="FTP Server|TCP|21|21">FTP Server</option>
+                      <option value="IPSEC|UDP|500|500">IPSEC</option>
+                      <option value="Mail POP3|TCP|110|110">Mail POP3</option>
+                      <option value="Mail SMTP|TCP|25|25">Mail SMTP</option>
+                      <option value="PPTP|TCP|1723|1723">PPTP</option>
+                      <option value="Real Player 8 Plus|UDP|7070|7070">Real Player 8 Plus</option>
+                      <option value="Secure Shell Server|TCP|22|22">Secure Shell Server</option>
+                      <option value="SNMP|UDP|161|161">SNMP</option>
+                      <option value="SNMP Trap|UDP|162|162">SNMP Trap</option>
+                      <option value="Telnet Server|TCP|23|23">Telnet Server</option>
+                      <option value="TFTP|UDP|69|69">TFTP</option>
                     </select>
                   </td>
                 </tr>
                 <tr>
-                  <th>Giao diện WAN:</th>
-                  <td><select class="vht-select"><option>1_INTERNET_R_VID_35</option></select></td>
+                  <th>Giao thức</th>
+                  <td>
+                    <select class="vht-select" id="pf-proto">
+                      <option value="TCP" ${editingItem && editingItem.proto === "TCP" ? "selected" : ""}>TCP</option>
+                      <option value="UDP" ${editingItem && editingItem.proto === "UDP" ? "selected" : ""}>UDP</option>
+                      <option value="TCP/UDP" ${editingItem && editingItem.proto === "TCP/UDP" ? "selected" : ""}>TCP/UDP</option>
+                    </select>
+                  </td>
                 </tr>
                 <tr>
-                  <th>IP trong (Internal LAN IP):</th>
-                  <td><input type="text" class="vht-input med" id="pf-ip" value="192.168.1.150" /></td>
+                  <th>Tên Mapping</th>
+                  <td><input type="text" class="vht-input" id="pf-name" value="${esc(editingItem ? editingItem.name : "Web_Server_LAN")}" /></td>
                 </tr>
                 <tr>
-                  <th>Port trong (Internal Port):</th>
-                  <td><input type="number" class="vht-input short" id="pf-inport" value="80" /></td>
+                  <th>IP trong</th>
+                  <td><input type="text" class="vht-input" id="pf-ip" value="${esc(editingItem ? editingItem.internalIp : "192.168.1.150")}" /></td>
                 </tr>
                 <tr>
-                  <th>Port ngoài (External WAN Port):</th>
-                  <td><input type="number" class="vht-input short" id="pf-extport" value="8080" /></td>
+                  <th>Port trong</th>
+                  <td><input type="text" class="vht-input" id="pf-inport" value="${esc(editingItem ? editingItem.internalPort : "80")}" /></td>
+                </tr>
+                <tr>
+                  <th>Port ngoài</th>
+                  <td><input type="text" class="vht-input" id="pf-extport" value="${esc(editingItem ? editingItem.externalPort : "8080")}" /></td>
                 </tr>
               </table>
-              <div class="btn-row">
-                <button type="button" class="btn-vht" id="pf-btn-save">LƯU &amp; ÁP DỤNG</button>
+              <div class="btn-row center" style="gap:14px;">
+                <button type="button" class="btn-vht" id="pf-btn-save">ÁP DỤNG</button>
+                <button type="button" class="btn-vht secondary" id="pf-btn-cancel">HỦY</button>
               </div>
             </div>`
                 : ""
             }
 
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>STT</th>
-                  <th>Tên Mapping</th>
-                  <th>Giao thức</th>
-                  <th>Port ngoài (WAN)</th>
-                  <th>IP trong (LAN)</th>
-                  <th>Port trong</th>
-                  <th>Trạng thái</th>
-                  <th>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${
-                  list.length === 0
-                    ? `<tr><td colspan="8" class="empty-row">Chưa có luật Port Forwarding nào. Bấm THÊM để tạo luật mới.</td></tr>`
-                    : list
-                        .map(
-                          (item, idx) => `
+            <div class="table-bordered-radius">
+              <table class="data-table">
+                <thead>
                   <tr>
-                    <td>${idx + 1}</td>
-                    <td><strong>${esc(item.name)}</strong></td>
-                    <td><span class="badge-pill gray">${esc(item.proto)}</span></td>
-                    <td><strong>${item.externalPort}</strong></td>
-                    <td><code>${esc(item.internalIp)}</code></td>
-                    <td><strong>${item.internalPort}</strong></td>
-                    <td><span class="badge-ok">Kích hoạt</span></td>
-                    <td><button type="button" class="btn-vht danger small pf-del" data-idx="${idx}">XÓA</button></td>
-                  </tr>`
-                        )
-                        .join("")
-                }
-              </tbody>
-            </table>
+                    <th style="width:44px;"><input type="checkbox" id="pf-chk-all" /></th>
+                    <th>Tên Mapping</th>
+                    <th>Giao thức</th>
+                    <th>IP trong</th>
+                    <th>Port trong</th>
+                    <th>Port ngoài</th>
+                    <th>Trạng thái</th>
+                    <th>Hiệu chỉnh</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${
+                    list.length === 0
+                      ? `<tr><td colspan="8" class="empty-row">Chưa có luật Port Forwarding nào.</td></tr>`
+                      : list
+                          .map(
+                            (item, idx) => `
+                    <tr>
+                      <td><input type="checkbox" class="pf-row-chk" data-idx="${idx}" /></td>
+                      <td>${esc(item.name)}</td>
+                      <td>${esc(item.proto)}</td>
+                      <td>${esc(item.internalIp)}</td>
+                      <td>${item.internalPort}</td>
+                      <td>${item.externalPort}</td>
+                      <td>
+                        <label class="vht-switch">
+                          <input type="checkbox" class="pf-row-en" data-idx="${idx}" ${item.enabled !== false ? "checked" : ""} />
+                          <span class="vht-slider"></span>
+                        </label>
+                      </td>
+                      <td><button type="button" class="btn-icon pf-edit" data-idx="${idx}" title="Hiệu chỉnh">✏️</button></td>
+                    </tr>`
+                          )
+                          .join("")
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <div class="btn-row" style="justify-content:flex-end;margin-top:16px;">
+              <button type="button" class="btn-vht small" id="pf-btn-toggle-add">THÊM</button>
+              <button type="button" class="btn-vht secondary small" id="pf-btn-del">XÓA</button>
+            </div>
           </div>
         </div>
       `;
     },
     bind: function () {
       const self = this;
+      const list = window.SimState.apps.portForwarding;
+
       document.getElementById("pf-btn-toggle-add").addEventListener("click", function () {
-        self.showForm = !self.showForm;
+        self.editIndex = -1;
+        self.showForm = true;
+        window.RouterApp.renderCurrentPage();
+      });
+
+      const chkAll = document.getElementById("pf-chk-all");
+      if (chkAll) {
+        chkAll.addEventListener("change", function () {
+          document.querySelectorAll(".pf-row-chk").forEach(function (c) {
+            c.checked = chkAll.checked;
+          });
+        });
+      }
+
+      document.querySelectorAll(".pf-row-en").forEach(function (sw) {
+        sw.addEventListener("change", function () {
+          const i = parseInt(sw.getAttribute("data-idx"), 10);
+          if (list[i]) {
+            list[i].enabled = sw.checked;
+            window.SimEngine.saveState();
+          }
+        });
+      });
+
+      document.querySelectorAll(".pf-edit").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          self.editIndex = parseInt(btn.getAttribute("data-idx"), 10);
+          self.showForm = true;
+          window.RouterApp.renderCurrentPage();
+        });
+      });
+
+      document.getElementById("pf-btn-del").addEventListener("click", function () {
+        const chks = Array.from(document.querySelectorAll(".pf-row-chk:checked")).map(function (c) {
+          return parseInt(c.getAttribute("data-idx"), 10);
+        });
+        if (chks.length === 0) {
+          return alert("Vui lòng tích chọn ít nhất 1 mục cần xóa!");
+        }
+        chks
+          .sort(function (a, b) {
+            return b - a;
+          })
+          .forEach(function (idx) {
+            list.splice(idx, 1);
+          });
+        self.showForm = false;
+        self.editIndex = -1;
+        window.SimEngine.saveState();
         window.RouterApp.renderCurrentPage();
       });
 
       if (self.showForm) {
+        const srvRow = document.getElementById("pf-service-row");
         const presetSel = document.getElementById("pf-preset");
         document.querySelectorAll('input[name="pf-srv-mode"]').forEach(function (rad) {
           rad.addEventListener("change", function () {
-            presetSel.disabled = rad.value !== "preset" || !rad.checked;
-            if (rad.value === "preset" && rad.checked) {
-              presetSel.dispatchEvent(new Event("change"));
-            }
+            srvRow.style.display = rad.value === "preset" && rad.checked ? "" : "none";
           });
         });
 
         presetSel.addEventListener("change", function () {
+          if (!presetSel.value) return;
           const [nm, pr, inp, extp] = presetSel.value.split("|");
           document.getElementById("pf-name").value = nm;
           document.getElementById("pf-proto").value = pr;
           document.getElementById("pf-inport").value = inp;
           document.getElementById("pf-extport").value = extp;
+        });
+
+        document.getElementById("pf-btn-cancel").addEventListener("click", function () {
+          self.showForm = false;
+          self.editIndex = -1;
+          window.RouterApp.renderCurrentPage();
         });
 
         document.getElementById("pf-btn-save").addEventListener("click", function () {
@@ -227,7 +334,7 @@
             return alert("Số hiệu cổng (Port) phải từ 1 đến 65535!");
           }
 
-          window.SimState.apps.portForwarding.push({
+          const obj = {
             id: Date.now(),
             name: name,
             proto: proto,
@@ -235,23 +342,22 @@
             internalPort: inPort,
             externalPort: extPort,
             enabled: true
-          });
+          };
+
+          if (self.editIndex >= 0 && list[self.editIndex]) {
+            list[self.editIndex] = obj;
+          } else {
+            list.push(obj);
+          }
+
           self.showForm = false;
+          self.editIndex = -1;
           window.SimEngine.addLog(
             "[PORT FORWARDING] Mở cổng " + proto + " WAN:" + extPort + " -> " + ip + ":" + inPort + " (" + name + ")."
           );
-          window.RouterApp.applyWithFeedback("Đã thêm luật Port Forwarding (" + name + ")!");
+          window.RouterApp.applyWithFeedback("Đã lưu luật Port Forwarding (" + name + ")!");
         });
       }
-
-      document.querySelectorAll(".pf-del").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          const i = parseInt(btn.getAttribute("data-idx"), 10);
-          window.SimState.apps.portForwarding.splice(i, 1);
-          window.SimEngine.saveState();
-          window.RouterApp.renderCurrentPage();
-        });
-      });
     }
   };
 
@@ -259,59 +365,79 @@
   // 14. Ứng dụng -> Giới hạn phiên kết nối (/cgi-bin/apps-sslim.asp)
   // --------------------------------------------------------------------------
   window.RouterPages["apps-sslim"] = {
-    title: "Giới hạn phiên kết nối (NAT Session Limit)",
+    title: "Giới hạn phiên kết nối",
     group: "Ứng dụng",
     cgi: "/cgi-bin/apps-sslim.asp",
     render: function () {
       const sl = window.SimState.apps.sessionLimit;
       return `
-        <div class="vht-card">
-          <div class="vht-card-header">Giới hạn số lượng phiên kết nối đồng thời (Chống tràn bộ nhớ NAT do P2P/Torrent/Mã độc)</div>
-          <div class="vht-card-body">
-            <table class="form-table">
+        <div class="vht-widget">
+          <header class="vht-widget-title">Giới hạn phiên kết nối</header>
+          <div class="vht-card">
+            <legend class="vht-legend">Giới hạn tổng số phiên</legend>
+            <table class="form-table" style="margin-bottom:20px;">
               <tr>
-                <th>Tổng số phiên NAT tối đa toàn hệ thống:</th>
-                <td><strong>${sl.systemMax}</strong> phiên <span class="field-hint">(Giới hạn phần cứng NAT Table)</span></td>
+                <th>Giao diện</th>
+                <td><strong>1_INTERNET_R_VID_35</strong></td>
               </tr>
               <tr>
-                <th>Kích hoạt giới hạn phiên mỗi IP:</th>
-                <td><label class="check-item"><input type="checkbox" id="sl-en" ${sl.enabled ? "checked" : ""} /> <strong>Bật kiểm soát phiên</strong></label></td>
-              </tr>
-              <tr>
-                <th>Số phiên tối đa mặc định mỗi người dùng:</th>
-                <td><input type="number" class="vht-input short" id="sl-def" value="${sl.defaultPerIp}" /> phiên / máy</td>
+                <th>Tổng số phiên tối đa</th>
+                <td>
+                  <input type="text" class="vht-input short" id="sl-sysmax" value="${sl.systemMax || 16384}" />
+                  <span class="field-hint">(8000-16384)</span>
+                </td>
               </tr>
             </table>
-            <div class="btn-row" style="margin-bottom:16px;">
-              <button class="btn-vht" id="sl-apply">ÁP DỤNG</button>
+
+            <legend class="vht-legend">Giới hạn cho từng người dùng</legend>
+            <table class="form-table" style="margin-bottom:20px;">
+              <tr>
+                <th>Giới hạn cho từng người dùng</th>
+                <td>${swHtml("sl-en", sl.enabled)}</td>
+              </tr>
+              <tr>
+                <th>Giới hạn mặc định</th>
+                <td><input type="text" class="vht-input short" id="sl-def" value="${sl.defaultPerIp}" /></td>
+              </tr>
+            </table>
+
+            <legend class="vht-legend">Bảng giới hạn cho từng IP cụ thể</legend>
+            <div class="table-bordered-radius" style="margin-bottom:14px;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Địa chỉ IP</th>
+                    <th>Giới hạn</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${
+                    sl.rules.length === 0
+                      ? `<tr><td colspan="3" class="empty-row">Chưa có giới hạn riêng.</td></tr>`
+                      : sl.rules
+                          .map(
+                            (r, i) => `
+                    <tr>
+                      <td>${esc(r.ip)}</td>
+                      <td>${r.max}</td>
+                      <td><button type="button" class="btn-icon sl-del" data-idx="${i}">🗑️</button></td>
+                    </tr>`
+                          )
+                          .join("")
+                  }
+                  <tr>
+                    <td><input type="text" class="vht-input" id="sl-ip" placeholder="192.168.1.50" style="max-width:220px;" /></td>
+                    <td><input type="text" class="vht-input short" id="sl-max" placeholder="2000" /></td>
+                    <td><button type="button" class="btn-vht small" id="sl-add">THÊM</button></td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
 
-            <div style="font-weight:700;margin-bottom:8px;">Bảng giới hạn phiên riêng cho từng địa chỉ IP LAN:</div>
-            <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">
-              <input type="text" class="vht-input med" id="sl-ip" placeholder="192.168.1.50" />
-              <input type="number" class="vht-input short" id="sl-max" placeholder="2000" />
-              <button type="button" class="btn-vht small" id="sl-add">THÊM</button>
+            <div class="btn-row center">
+              <button type="button" class="btn-vht" id="sl-apply">ÁP DỤNG</button>
             </div>
-            <table class="data-table">
-              <thead><tr><th>STT</th><th>Địa chỉ IP LAN</th><th>Số phiên tối đa</th><th>Thao tác</th></tr></thead>
-              <tbody>
-                ${
-                  sl.rules.length === 0
-                    ? `<tr><td colspan="4" class="empty-row">Chưa có giới hạn riêng (Mọi máy áp dụng mức mặc định ${sl.defaultPerIp} phiên).</td></tr>`
-                    : sl.rules
-                        .map(
-                          (r, i) => `
-                  <tr>
-                    <td>${i + 1}</td>
-                    <td><code>${esc(r.ip)}</code></td>
-                    <td><strong>${r.max}</strong></td>
-                    <td><button class="btn-vht danger small sl-del" data-idx="${i}">XÓA</button></td>
-                  </tr>`
-                        )
-                        .join("")
-                }
-              </tbody>
-            </table>
           </div>
         </div>
       `;
@@ -319,26 +445,27 @@
     bind: function () {
       const sl = window.SimState.apps.sessionLimit;
       document.getElementById("sl-apply").addEventListener("click", function () {
+        sl.systemMax = parseInt(document.getElementById("sl-sysmax").value, 10) || 16384;
         sl.enabled = document.getElementById("sl-en").checked;
-        sl.defaultPerIp = parseInt(document.getElementById("sl-def").value, 10) || 8000;
+        sl.defaultPerIp = parseInt(document.getElementById("sl-def").value, 10) || 4096;
         window.SimEngine.addLog("[SESSION LIMIT] Cập nhật giới hạn phiên mặc định: " + sl.defaultPerIp + "/IP.");
         window.RouterApp.applyWithFeedback("Đã lưu cấu hình Giới hạn phiên kết nối!");
       });
       document.getElementById("sl-add").addEventListener("click", function () {
         const ip = document.getElementById("sl-ip").value.trim();
         const mx = parseInt(document.getElementById("sl-max").value, 10);
-        if (!ip || !mx) return alert("Vui lòng nhập đầy đủ IP và số phiên tối đa!");
+        if (!ip || !mx) return alert("Vui lòng nhập đầy đủ Địa chỉ IP và Giới hạn!");
         sl.rules.push({ ip: ip, max: mx });
         window.SimEngine.saveState();
         window.RouterApp.renderCurrentPage();
       });
-      document.querySelectorAll(".sl-del").forEach((b) =>
+      document.querySelectorAll(".sl-del").forEach(function (b) {
         b.addEventListener("click", function () {
           sl.rules.splice(parseInt(b.getAttribute("data-idx"), 10), 1);
           window.SimEngine.saveState();
           window.RouterApp.renderCurrentPage();
-        })
-      );
+        });
+      });
     }
   };
 
@@ -346,78 +473,144 @@
   // 15. Ứng dụng -> Định tuyến tĩnh (/cgi-bin/apps-route.asp)
   // --------------------------------------------------------------------------
   window.RouterPages["apps-route"] = {
-    title: "Định tuyến tĩnh (Static Routing)",
+    title: "Định tuyến tĩnh",
     group: "Ứng dụng",
     cgi: "/cgi-bin/apps-route.asp",
+    showForm: false,
     render: function () {
       const routes = window.SimState.apps.staticRoutes;
       return `
-        <div class="vht-card">
-          <div class="vht-card-header">Bảng Định tuyến tĩnh (Dẫn đường sang lớp mạng con / Router phụ nội bộ)</div>
-          <div class="vht-card-body">
-            <table class="form-table" style="margin-bottom:12px;">
-              <tr><th>Địa chỉ IP mạng đích:</th><td><input type="text" class="vht-input med" id="sr-dest" placeholder="192.168.2.0" /></td></tr>
-              <tr><th>Subnet Mask:</th><td><input type="text" class="vht-input med" id="sr-mask" value="255.255.255.0" /></td></tr>
-              <tr><th>Gateway (Next-Hop IP):</th><td><input type="text" class="vht-input med" id="sr-gw" placeholder="192.168.1.254" /></td></tr>
-              <tr>
-                <th>Giao diện mạng:</th>
-                <td>
-                  <select class="vht-select" id="sr-iface">
-                    <option value="LAN (br0)">LAN (br0)</option>
-                    <option value="1_INTERNET_R_VID_35">1_INTERNET_R_VID_35</option>
-                  </select>
-                </td>
-              </tr>
-            </table>
-            <div class="btn-row" style="margin-bottom:14px;">
-              <button class="btn-vht" id="sr-add">THÊM TUYẾN ĐƯỜNG</button>
+        <div class="vht-widget">
+          <header class="vht-widget-title">Định tuyến tĩnh</header>
+          <div class="vht-card">
+            <legend class="vht-legend">Định tuyến tĩnh</legend>
+            <div class="table-bordered-radius">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th style="width:44px;"><input type="checkbox" id="sr-chk-all" /></th>
+                    <th>IP đích</th>
+                    <th>Gateway</th>
+                    <th>Mặt nạ mạng con</th>
+                    <th>Giao diện mạng</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${
+                    routes.length === 0
+                      ? `<tr><td colspan="5" class="empty-row">Chưa có tuyến định tuyến tĩnh nào.</td></tr>`
+                      : routes
+                          .map(
+                            (r, i) => `
+                    <tr>
+                      <td><input type="checkbox" class="sr-row-chk" data-idx="${i}" /></td>
+                      <td>${esc(r.destIp)}</td>
+                      <td>${esc(r.gateway)}</td>
+                      <td>${esc(r.mask)}</td>
+                      <td>${esc(r.iface)}</td>
+                    </tr>`
+                          )
+                          .join("")
+                  }
+                </tbody>
+              </table>
             </div>
 
-            <table class="data-table">
-              <thead><tr><th>STT</th><th>Mạng đích</th><th>Subnet Mask</th><th>Gateway</th><th>Giao diện</th><th>Thao tác</th></tr></thead>
-              <tbody>
-                ${
-                  routes.length === 0
-                    ? `<tr><td colspan="6" class="empty-row">Chưa có tuyến định tuyến tĩnh nào được khai báo.</td></tr>`
-                    : routes
-                        .map(
-                          (r, i) => `
-                  <tr>
-                    <td>${i + 1}</td>
-                    <td><code>${esc(r.destIp)}</code></td>
-                    <td><code>${esc(r.mask)}</code></td>
-                    <td><code>${esc(r.gateway)}</code></td>
-                    <td>${esc(r.iface)}</td>
-                    <td><button class="btn-vht danger small sr-del" data-idx="${i}">XÓA</button></td>
-                  </tr>`
-                        )
-                        .join("")
-                }
-              </tbody>
-            </table>
+            <div class="btn-row" style="justify-content:flex-end;margin-top:16px;">
+              <button type="button" class="btn-vht small" id="sr-btn-show-add">THÊM</button>
+              <button type="button" class="btn-vht secondary small" id="sr-btn-del">XÓA</button>
+            </div>
+
+            ${
+              this.showForm
+                ? `
+            <div style="border-top:1px solid #f0f0f0;margin-top:18px;padding-top:18px;">
+              <legend class="vht-legend">Thêm mục mới</legend>
+              <table class="form-table">
+                <tr>
+                  <th>Địa chỉ IP đích</th>
+                  <td><input type="text" class="vht-input" id="sr-dest" placeholder="192.168.2.0" /></td>
+                </tr>
+                <tr>
+                  <th>Mặt nạ mạng con</th>
+                  <td><input type="text" class="vht-input" id="sr-mask" value="255.255.255.0" /></td>
+                </tr>
+                <tr>
+                  <th><label class="check-item"><input type="checkbox" id="sr-use-gw" checked /> Sử dụng gateway</label></th>
+                  <td><input type="text" class="vht-input" id="sr-gw" placeholder="192.168.1.254" /></td>
+                </tr>
+                <tr>
+                  <th><label class="check-item"><input type="checkbox" id="sr-use-if" checked /> Sử dụng giao diện mạng</label></th>
+                  <td>
+                    <select class="vht-select" id="sr-iface">
+                      <option value="1_INTERNET_R_VID_35">1_INTERNET_R_VID_35</option>
+                      <option value="LAN">LAN</option>
+                    </select>
+                  </td>
+                </tr>
+              </table>
+              <div class="btn-row center" style="gap:14px;">
+                <button type="button" class="btn-vht" id="sr-add">ÁP DỤNG</button>
+                <button type="button" class="btn-vht secondary" id="sr-cancel">HỦY</button>
+              </div>
+            </div>`
+                : ""
+            }
           </div>
         </div>
       `;
     },
     bind: function () {
+      const self = this;
       const routes = window.SimState.apps.staticRoutes;
-      document.getElementById("sr-add").addEventListener("click", function () {
-        const dest = document.getElementById("sr-dest").value.trim();
-        const mask = document.getElementById("sr-mask").value.trim();
-        const gw = document.getElementById("sr-gw").value.trim();
-        const iface = document.getElementById("sr-iface").value;
-        if (!dest || !mask || !gw) return alert("Vui lòng nhập đầy đủ Mạng đích, Subnet Mask và Gateway!");
-        routes.push({ destIp: dest, mask: mask, gateway: gw, iface: iface });
-        window.SimEngine.addLog("[STATIC ROUTE] Thêm tuyến tĩnh tới " + dest + " qua Gateway " + gw + ".");
-        window.RouterApp.applyWithFeedback("Đã thêm tuyến Định tuyến tĩnh!");
+
+      document.getElementById("sr-btn-show-add").addEventListener("click", function () {
+        self.showForm = true;
+        window.RouterApp.renderCurrentPage();
       });
-      document.querySelectorAll(".sr-del").forEach((b) =>
-        b.addEventListener("click", function () {
-          routes.splice(parseInt(b.getAttribute("data-idx"), 10), 1);
-          window.SimEngine.saveState();
+
+      const chkAll = document.getElementById("sr-chk-all");
+      if (chkAll) {
+        chkAll.addEventListener("change", function () {
+          document.querySelectorAll(".sr-row-chk").forEach(function (c) {
+            c.checked = chkAll.checked;
+          });
+        });
+      }
+
+      document.getElementById("sr-btn-del").addEventListener("click", function () {
+        const chks = Array.from(document.querySelectorAll(".sr-row-chk:checked")).map(function (c) {
+          return parseInt(c.getAttribute("data-idx"), 10);
+        });
+        if (chks.length === 0) return alert("Vui lòng tích chọn tuyến cần xóa!");
+        chks
+          .sort(function (a, b) {
+            return b - a;
+          })
+          .forEach(function (idx) {
+            routes.splice(idx, 1);
+          });
+        window.SimEngine.saveState();
+        window.RouterApp.renderCurrentPage();
+      });
+
+      if (self.showForm) {
+        document.getElementById("sr-cancel").addEventListener("click", function () {
+          self.showForm = false;
           window.RouterApp.renderCurrentPage();
-        })
-      );
+        });
+        document.getElementById("sr-add").addEventListener("click", function () {
+          const dest = document.getElementById("sr-dest").value.trim();
+          const mask = document.getElementById("sr-mask").value.trim();
+          const gw = document.getElementById("sr-gw").value.trim() || "0.0.0.0";
+          const iface = document.getElementById("sr-iface").value;
+          if (!dest || !mask) return alert("Vui lòng nhập Địa chỉ IP đích và Mặt nạ mạng con!");
+          routes.push({ destIp: dest, mask: mask, gateway: gw, iface: iface });
+          self.showForm = false;
+          window.SimEngine.addLog("[STATIC ROUTE] Thêm tuyến tĩnh tới " + dest + " qua Gateway " + gw + ".");
+          window.RouterApp.applyWithFeedback("Đã thêm tuyến Định tuyến tĩnh!");
+        });
+      }
     }
   };
 
@@ -425,52 +618,93 @@
   // 16. Ứng dụng -> DNS động (DDNS) (/cgi-bin/apps-ddns.asp)
   // --------------------------------------------------------------------------
   window.RouterPages["apps-ddns"] = {
-    title: "DNS động (Dynamic DNS - DDNS)",
+    title: "DNS động (DDNS)",
     group: "Ứng dụng",
     cgi: "/cgi-bin/apps-ddns.asp",
     render: function () {
       const d = window.SimState.apps.ddns;
       return `
-        <div class="vht-card">
-          <div class="vht-card-header">Đồng bộ địa chỉ IP WAN động với tên miền cố định (DynDNS / No-IP)</div>
-          <div class="vht-card-body">
+        <div class="vht-widget">
+          <header class="vht-widget-title">DNS động (DDNS)</header>
+          <div class="vht-card">
             <table class="form-table">
-              <tr><th>Kích hoạt DDNS:</th><td><label class="check-item"><input type="checkbox" id="ddns-en" ${d.enabled ? "checked" : ""} /> <strong>Bật DDNS</strong></label></td></tr>
               <tr>
-                <th>Nhà cung cấp dịch vụ:</th>
+                <th>Giao diện</th>
+                <td>
+                  <select class="vht-select" id="ddns-wan">
+                    <option value="1_INTERNET_R_VID_35">1_INTERNET_R_VID_35</option>
+                  </select>
+                </td>
+              </tr>
+              <tr>
+                <th>DNS động (DDNS)</th>
+                <td>
+                  <div class="check-grid">
+                    <label class="check-item"><input type="radio" name="ddns-en" value="1" ${d.enabled ? "checked" : ""} /> Kích hoạt</label>
+                    <label class="check-item"><input type="radio" name="ddns-en" value="0" ${!d.enabled ? "checked" : ""} /> Vô hiệu hóa</label>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <th>Chế độ dịch vụ</th>
+                <td>
+                  <div class="check-grid">
+                    <label class="check-item"><input type="radio" name="ddns-mode" value="Tự động" ${d.mode !== "Thủ công" ? "checked" : ""} /> Tự động</label>
+                    <label class="check-item"><input type="radio" name="ddns-mode" value="Thủ công" ${d.mode === "Thủ công" ? "checked" : ""} /> Thủ công</label>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <th>Nhà cung cấp dịch vụ</th>
                 <td>
                   <select class="vht-select" id="ddns-prov">
-                    <option value="DynDNS.org" ${d.provider === "DynDNS.org" ? "selected" : ""}>DynDNS.org</option>
-                    <option value="No-IP.com" ${d.provider === "No-IP.com" ? "selected" : ""}>No-IP.com</option>
+                    <option value="dyndns.org" ${d.provider === "dyndns.org" || d.provider === "DynDNS.org" ? "selected" : ""}>dyndns.org</option>
+                    <option value="no-ip.com" ${d.provider === "no-ip.com" || d.provider === "No-IP.com" ? "selected" : ""}>no-ip.com</option>
                   </select>
                 </td>
               </tr>
               <tr>
-                <th>Chế độ cập nhật:</th>
+                <th>Tên miền</th>
+                <td><input type="text" class="vht-input" id="ddns-host" value="${esc(d.hostname)}" /></td>
+              </tr>
+              <tr>
+                <th>Tên đăng nhập</th>
+                <td><input type="text" class="vht-input" id="ddns-user" value="${esc(d.username)}" /></td>
+              </tr>
+              <tr>
+                <th>Mật khẩu</th>
+                <td>${passHtml("ddns-pass", d.password, "")}</td>
+              </tr>
+              <tr>
+                <th>Hỗ trợ Wildcard</th>
                 <td>
-                  <select class="vht-select" id="ddns-mode">
-                    <option value="Tự động" ${d.mode === "Tự động" ? "selected" : ""}>Tự động (Khi IP WAN PPPoE thay đổi)</option>
-                    <option value="Thủ công" ${d.mode === "Thủ công" ? "selected" : ""}>Thủ công</option>
-                  </select>
+                  <div class="check-grid">
+                    <label class="check-item"><input type="radio" name="ddns-wild" value="1" /> Có</label>
+                    <label class="check-item"><input type="radio" name="ddns-wild" value="0" checked /> Không</label>
+                  </div>
                 </td>
               </tr>
-              <tr><th>Tên miền (Hostname):</th><td><input type="text" class="vht-input" id="ddns-host" value="${esc(d.hostname)}" placeholder="nha-cua-em.dyndns.org" /></td></tr>
-              <tr><th>Tài khoản:</th><td><input type="text" class="vht-input" id="ddns-user" value="${esc(d.username)}" /></td></tr>
-              <tr><th>Mật khẩu:</th><td><input type="password" class="vht-input" id="ddns-pass" value="${esc(d.password)}" /></td></tr>
+              <tr>
+                <th>Trạng thái</th>
+                <td>${d.enabled && d.hostname ? '<span class="text-green">Đã kết nối</span>' : "Chưa cấu hình"}</td>
+              </tr>
             </table>
-            <div class="btn-row">
-              <button class="btn-vht" id="ddns-apply">ÁP DỤNG</button>
+            <div class="btn-row center">
+              <button type="button" class="btn-vht" id="ddns-apply">ÁP DỤNG</button>
             </div>
           </div>
         </div>
       `;
     },
     bind: function () {
+      bindPassEyes();
       document.getElementById("ddns-apply").addEventListener("click", function () {
         const d = window.SimState.apps.ddns;
-        d.enabled = document.getElementById("ddns-en").checked;
+        const enRad = document.querySelector('input[name="ddns-en"]:checked');
+        const modeRad = document.querySelector('input[name="ddns-mode"]:checked');
+        d.enabled = enRad ? enRad.value === "1" : false;
+        d.mode = modeRad ? modeRad.value : "Tự động";
         d.provider = document.getElementById("ddns-prov").value;
-        d.mode = document.getElementById("ddns-mode").value;
         d.hostname = document.getElementById("ddns-host").value.trim();
         d.username = document.getElementById("ddns-user").value.trim();
         d.password = document.getElementById("ddns-pass").value;
@@ -484,124 +718,167 @@
   // 17. Ứng dụng -> Lập lịch Wi-Fi (/cgi-bin/apps-wifischeduling.asp)
   // --------------------------------------------------------------------------
   window.RouterPages["apps-wifischeduling"] = {
-    title: "Lập lịch Wi-Fi (Wi-Fi Auto Off/On Schedule)",
+    title: "Lập lịch Wi-Fi",
     group: "Ứng dụng",
     cgi: "/cgi-bin/apps-wifischeduling.asp",
+    editIdx: 0,
+    showEditor: true,
     render: function () {
-      const now = window.SimEngine.nowRouterDate();
-      const pad = (n) => String(n).padStart(2, "0");
-      const nowStr = window.SimEngine.formatDateTime(now) + " (" + window.SimEngine.getDayCode(now) + ")";
-      const rule = window.SimState.apps.wifiSchedules[0];
-      const activeOff = window.SimEngine.isWifiScheduledOff();
+      const schedules = window.SimState.apps.wifiSchedules;
+      while (schedules.length < 4) {
+        schedules.push({
+          id: schedules.length + 1,
+          name: "Rule" + (schedules.length + 1),
+          enabled: false,
+          start: "00:00",
+          end: "00:00",
+          days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        });
+      }
+      const rule = schedules[this.editIdx] || schedules[0];
       const daysMap = [
-        { code: "Sun", label: "CN (Sun)" },
-        { code: "Mon", label: "T2 (Mon)" },
-        { code: "Tue", label: "T3 (Tue)" },
-        { code: "Wed", label: "T4 (Wed)" },
-        { code: "Thu", label: "T5 (Thu)" },
-        { code: "Fri", label: "T6 (Fri)" },
-        { code: "Sat", label: "T7 (Sat)" }
+        { code: "Sun", label: "CN" },
+        { code: "Mon", label: "T2" },
+        { code: "Tue", label: "T3" },
+        { code: "Wed", label: "T4" },
+        { code: "Thu", label: "T5" },
+        { code: "Fri", label: "T6" },
+        { code: "Sat", label: "T7" }
       ];
 
-      // Pre-compute next minute suggestion for TV6 practice
-      const nextMinDate = new Date(now.getTime() + 60000);
-      const endMinDate = new Date(now.getTime() + 6 * 60000);
-      const nextStartHint = pad(nextMinDate.getHours()) + ":" + pad(nextMinDate.getMinutes());
-      const nextEndHint = pad(endMinDate.getHours()) + ":" + pad(endMinDate.getMinutes());
+      function formatDaysVi(daysArr) {
+        if (!daysArr || daysArr.length === 0) return "";
+        if (daysArr.length === 7) return "Hằng ngày";
+        return daysMap
+          .filter(function (d) {
+            return daysArr.includes(d.code);
+          })
+          .map(function (d) {
+            return d.label;
+          })
+          .join(", ");
+      }
 
       return `
-        <div class="vht-notice ${activeOff ? "warn" : ""}">
-          <strong>Giờ hệ thống Router hiện tại:</strong> <code id="wsch-live-clock">${esc(nowStr)}</code>
-          &nbsp;|&nbsp;
-          <strong>Trạng thái bộ phát sóng:</strong>
-          ${
-            activeOff
-              ? `<span class="badge-err">🔴 ĐANG TẮT SÓNG WI-FI THEO LỊCH HẸN (${esc(activeOff.name)}: ${activeOff.start} – ${activeOff.end})!</span>`
-              : `<span class="badge-ok">🟢 Đang phát sóng bình thường</span>`
-          }
-        </div>
-
-        <div class="vht-card">
-          <div class="vht-card-header">
-            <span>Thiết lập khung giờ tự động TẮT toàn bộ sóng Wi-Fi</span>
-            <div style="display:flex;gap:6px;">
-              <button type="button" class="btn-vht outline small" id="wsch-fill-nextmin">
-                ⚡ Đặt hẹn tắt ở phút kế tiếp (${nextStartHint} – ${nextEndHint})
-              </button>
-              <button type="button" class="btn-vht secondary small" id="wsch-jump-1min" title="Tua nhanh đồng hồ Router thêm 1 phút để test ngay không cần chờ 60 giây!">
-                ⏩ Tua đồng hồ Router +1 Phút
-              </button>
+        <div class="vht-widget">
+          <header class="vht-widget-title">Lập lịch Wi-Fi</header>
+          <div class="vht-card">
+            <legend class="vht-legend">Danh sách lập lịch</legend>
+            <div class="table-bordered-radius" style="margin-bottom:20px;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Tên luật</th>
+                    <th>Thời gian bắt đầu</th>
+                    <th>Thời gian kết thúc</th>
+                    <th>Lặp lại</th>
+                    <th>Trạng thái</th>
+                    <th>Thao Tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${schedules
+                    .map(
+                      (r, idx) => `
+                  <tr>
+                    <td>${esc(r.name || "Rule" + (idx + 1))}</td>
+                    <td>${esc(r.start)}</td>
+                    <td>${esc(r.end)}</td>
+                    <td>${esc(formatDaysVi(r.days))}</td>
+                    <td>${r.enabled ? '<span class="text-green">Kích hoạt</span>' : "Vô hiệu hóa"}</td>
+                    <td><button type="button" class="btn-icon wsch-edit-row" data-idx="${idx}" title="Sửa lịch">✏️</button></td>
+                  </tr>`
+                    )
+                    .join("")}
+                </tbody>
+              </table>
             </div>
-          </div>
-          <div class="vht-card-body">
-            <table class="form-table">
-              <tr>
-                <th>Kích hoạt lịch tắt Wi-Fi:</th>
-                <td><label class="check-item"><input type="checkbox" id="wsch-en" ${rule.enabled ? "checked" : ""} /> <strong>Kích hoạt (Bật hẹn giờ)</strong></label></td>
-              </tr>
-              <tr>
-                <th>Tên lịch trình:</th>
-                <td><input type="text" class="vht-input" id="wsch-name" value="${esc(rule.name)}" /></td>
-              </tr>
-              <tr>
-                <th>Thời gian bắt đầu tắt sóng:</th>
-                <td><input type="time" class="vht-input short" id="wsch-start" value="${esc(rule.start)}" /></td>
-              </tr>
-              <tr>
-                <th>Thời gian bật sóng trở lại:</th>
-                <td><input type="time" class="vht-input short" id="wsch-end" value="${esc(rule.end)}" /></td>
-              </tr>
-              <tr>
-                <th>Các ngày áp dụng trong tuần:</th>
-                <td>
-                  <div class="check-grid">
-                    ${daysMap
-                      .map(
-                        (d) =>
-                          `<label class="check-item"><input type="checkbox" class="wsch-day" value="${d.code}" ${(rule.days || []).includes(d.code) ? "checked" : ""} /> ${d.label}</label>`
-                      )
-                      .join("")}
-                  </div>
-                </td>
-              </tr>
-            </table>
-            <div class="btn-row">
-              <button class="btn-vht" id="wsch-apply">ÁP DỤNG</button>
+
+            ${
+              this.showEditor
+                ? `
+            <div style="border-top:1px solid #f0f0f0;padding-top:18px;">
+              <legend class="vht-legend">Sửa lịch</legend>
+              <table class="form-table">
+                <tr>
+                  <th>Kích hoạt</th>
+                  <td>${swHtml("wsch-en", rule.enabled)}</td>
+                </tr>
+                <tr>
+                  <th>Tên luật</th>
+                  <td><input type="text" class="vht-input" id="wsch-name" value="${esc(rule.name)}" /></td>
+                </tr>
+                <tr>
+                  <th>Thời gian bắt đầu</th>
+                  <td><input type="text" class="vht-input short" id="wsch-start" value="${esc(rule.start)}" placeholder="HH:MM" /></td>
+                </tr>
+                <tr>
+                  <th>Thời gian kết thúc</th>
+                  <td><input type="text" class="vht-input short" id="wsch-end" value="${esc(rule.end)}" placeholder="HH:MM" /></td>
+                </tr>
+                <tr>
+                  <th>Lặp lại</th>
+                  <td>
+                    <div class="table-bordered-radius" style="max-width:460px;">
+                      <table class="data-table">
+                        <thead>
+                          <tr>
+                            ${daysMap.map((d) => `<th>${d.label}</th>`).join("")}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            ${daysMap
+                              .map(
+                                (d) =>
+                                  `<td><input type="checkbox" class="wsch-day" value="${d.code}" ${(rule.days || []).includes(d.code) ? "checked" : ""} /></td>`
+                              )
+                              .join("")}
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </div>`
+                : ""
+            }
+
+            <div class="btn-row center" style="gap:14px;">
+              <button type="button" class="btn-vht" id="wsch-apply">ÁP DỤNG</button>
+              <button type="button" class="btn-vht secondary" id="wsch-cancel">HỦY</button>
             </div>
           </div>
         </div>
       `;
     },
     bind: function () {
-      const rule = window.SimState.apps.wifiSchedules[0];
+      const self = this;
+      const schedules = window.SimState.apps.wifiSchedules;
 
-      document.getElementById("wsch-fill-nextmin").addEventListener("click", function () {
-        const now = window.SimEngine.nowRouterDate();
-        const pad = (n) => String(n).padStart(2, "0");
-        const d1 = new Date(now.getTime() + 60000);
-        const d2 = new Date(now.getTime() + 6 * 60000);
-        document.getElementById("wsch-start").value = pad(d1.getHours()) + ":" + pad(d1.getMinutes());
-        document.getElementById("wsch-end").value = pad(d2.getHours()) + ":" + pad(d2.getMinutes());
-        document.getElementById("wsch-en").checked = true;
-        document.querySelectorAll(".wsch-day").forEach((c) => (c.checked = true));
+      document.querySelectorAll(".wsch-edit-row").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          self.editIdx = parseInt(btn.getAttribute("data-idx"), 10);
+          self.showEditor = true;
+          window.RouterApp.renderCurrentPage();
+        });
       });
 
-      document.getElementById("wsch-jump-1min").addEventListener("click", function () {
-        window.SimState.admin.clockOffsetSec = (window.SimState.admin.clockOffsetSec || 0) + 60;
-        window.SimEngine.reconcileClients();
-        window.SimEngine.saveState();
-        window.RouterApp.showToast("Đã tua nhanh đồng hồ Router thêm +1 phút để kiểm thử Lập lịch Wi-Fi!");
+      document.getElementById("wsch-cancel").addEventListener("click", function () {
         window.RouterApp.renderCurrentPage();
-        window.LabUI.render();
       });
 
       document.getElementById("wsch-apply").addEventListener("click", function () {
-        const days = Array.from(document.querySelectorAll(".wsch-day:checked")).map((c) => c.value);
+        const rule = schedules[self.editIdx] || schedules[0];
+        const days = Array.from(document.querySelectorAll(".wsch-day:checked")).map(function (c) {
+          return c.value;
+        });
         if (days.length === 0) return alert("Vui lòng chọn ít nhất 1 ngày trong tuần!");
         rule.enabled = document.getElementById("wsch-en").checked;
-        rule.name = document.getElementById("wsch-name").value.trim() || "Tat_WiFi_Dem";
-        rule.start = document.getElementById("wsch-start").value || "01:00";
-        rule.end = document.getElementById("wsch-end").value || "05:00";
+        rule.name = document.getElementById("wsch-name").value.trim() || "Rule" + (self.editIdx + 1);
+        rule.start = document.getElementById("wsch-start").value.trim() || "00:00";
+        rule.end = document.getElementById("wsch-end").value.trim() || "00:00";
         rule.days = days;
 
         window.SimEngine.reconcileClients();
@@ -617,93 +894,128 @@
   // 18. Bảo dưỡng -> Quản trị (/cgi-bin/tools-admin.asp)
   // --------------------------------------------------------------------------
   window.RouterPages["tools-admin"] = {
-    title: "Quản trị hệ thống (Administration & Access Control)",
+    title: "Quản trị",
     group: "Bảo dưỡng",
     cgi: "/cgi-bin/tools-admin.asp",
     render: function () {
       const adm = window.SimState.admin;
       const dev = window.SimState.device;
       return `
-        <div class="vht-card">
-          <div class="vht-card-header">1. Đổi mật khẩu tài khoản quản trị (admin)</div>
-          <div class="vht-card-body">
+        <!-- Widget 1: Quản trị viên -->
+        <div class="vht-widget">
+          <header class="vht-widget-title">Quản trị viên</header>
+          <div class="vht-card">
+            <legend class="vht-legend">Tài khoản</legend>
             <table class="form-table">
-              <tr><th>Tài khoản:</th><td><strong>admin</strong></td></tr>
-              <tr><th>Mật khẩu cũ:</th><td><input type="password" class="vht-input" id="adm-old" placeholder="Nhập mật khẩu hiện tại" /></td></tr>
               <tr>
-                <th>Mật khẩu mới:</th>
+                <th>Tên người dùng</th>
+                <td><strong>admin</strong></td>
+              </tr>
+              <tr>
+                <th>Mật khẩu hiện tại</th>
+                <td>${passHtml("adm-old", "", "")}</td>
+              </tr>
+              <tr>
+                <th>Mật khẩu mới</th>
                 <td>
-                  <input type="password" class="vht-input" id="adm-new" placeholder="Tối thiểu 8 ký tự (Hoa, thường, số, ký tự đặc biệt)" />
+                  ${passHtml("adm-new", "", "")}
+                  <div class="field-hint" style="margin-top:6px;">Mật khẩu phải dài từ 8 ký tự bao gồm chữ hoa, chữ thường, số và các ký tự đặc biệt</div>
                 </td>
               </tr>
-              <tr><th>Xác nhận mật khẩu mới:</th><td><input type="password" class="vht-input" id="adm-confirm" /></td></tr>
+              <tr>
+                <th>Xác nhận mật khẩu</th>
+                <td>${passHtml("adm-confirm", "", "")}</td>
+              </tr>
             </table>
+            <div class="btn-row center">
+              <button type="button" class="btn-vht" id="adm-pass-apply">ÁP DỤNG</button>
+            </div>
           </div>
         </div>
 
-        <div class="vht-card">
-          <div class="vht-card-header">2. Phân quyền truy cập trang Quản trị &amp; Thời gian hết phiên</div>
-          <div class="vht-card-body">
-            <table class="form-table">
+        <!-- Widget 2: Quản lý truy nhập -->
+        <div class="vht-widget">
+          <header class="vht-widget-title">Quản lý truy nhập</header>
+          <div class="vht-card">
+            <legend class="vht-legend">Quản lý truy nhập</legend>
+            <table class="form-table" style="margin-bottom:18px;">
               <tr>
-                <th>Tên thiết bị (System Hostname):</th>
-                <td><input type="text" class="vht-input" id="adm-devname" value="${esc(dev.name)}" /></td>
-              </tr>
-              <tr>
-                <th>Cho phép người quản trị truy nhập từ:</th>
+                <th>Cho phép người quản trị truy nhập từ</th>
                 <td>
                   <div class="check-grid">
-                    <label class="check-item"><input type="checkbox" id="adm-lan" ${adm.allowLan ? "checked" : ""} disabled /> <strong>LAN (Mạng nội bộ trong nhà — An toàn)</strong></label>
-                    <label class="check-item"><input type="checkbox" id="adm-wan" ${adm.allowWan ? "checked" : ""} /> <span style="color:#dc2626;font-weight:600;">WAN (Ngoài Internet — Khuyến nghị TẮT để chống dò mật khẩu!)</span></label>
+                    <label class="check-item"><input type="checkbox" id="adm-wan" ${adm.allowWan ? "checked" : ""} /> WAN</label>
+                    <label class="check-item"><input type="checkbox" id="adm-lan" ${adm.allowLan ? "checked" : ""} disabled /> LAN</label>
                   </div>
                 </td>
               </tr>
               <tr>
-                <th>Thời gian hết phiên (Session Timeout):</th>
+                <th>Thời gian hết phiên</th>
                 <td>
                   <select class="vht-select" id="adm-timeout">
                     <option value="2.5" ${adm.sessionTimeoutMin == 2.5 ? "selected" : ""}>2.5 phút</option>
-                    <option value="5" ${adm.sessionTimeoutMin == 5 ? "selected" : ""}>5 phút (Mặc định = 300s — Lưu ý tránh tự đăng xuất khi đứng giảng!)</option>
+                    <option value="5" ${adm.sessionTimeoutMin == 5 ? "selected" : ""}>5 phút</option>
                     <option value="10" ${adm.sessionTimeoutMin == 10 ? "selected" : ""}>10 phút</option>
                     <option value="20" ${adm.sessionTimeoutMin == 20 ? "selected" : ""}>20 phút</option>
-                    <option value="0" ${adm.sessionTimeoutMin == 0 ? "selected" : ""}>Không giới hạn</option>
                   </select>
                 </td>
               </tr>
+            </table>
+
+            <legend class="vht-legend">Cấu hình port cho giao diện web</legend>
+            <table class="form-table">
               <tr>
-                <th>Cổng dịch vụ Web UI:</th>
-                <td>
-                  HTTP Port: <input type="number" class="vht-input short" id="adm-http" value="${adm.httpPort}" />
-                  &nbsp;|&nbsp;
-                  HTTPS Port: <input type="number" class="vht-input short" id="adm-https" value="${adm.httpsPort}" />
-                </td>
+                <th>Port cho HTTP</th>
+                <td><input type="text" class="vht-input short" id="adm-http" value="${adm.httpPort}" /></td>
+              </tr>
+              <tr>
+                <th>Port cho HTTPS</th>
+                <td><input type="text" class="vht-input short" id="adm-https" value="${adm.httpsPort}" /></td>
               </tr>
             </table>
-            <div class="btn-row">
-              <button class="btn-vht" id="adm-apply">ÁP DỤNG</button>
+            <div class="btn-row center">
+              <button type="button" class="btn-vht" id="adm-apply">ÁP DỤNG</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Widget 3: Tên thiết bị -->
+        <div class="vht-widget">
+          <header class="vht-widget-title">Tên thiết bị</header>
+          <div class="vht-card">
+            <table class="form-table">
+              <tr>
+                <th>Tên thiết bị</th>
+                <td><input type="text" class="vht-input" id="adm-devname" value="${esc(dev.name)}" /></td>
+              </tr>
+            </table>
+            <div class="btn-row center">
+              <button type="button" class="btn-vht" id="adm-devname-apply">ÁP DỤNG</button>
             </div>
           </div>
         </div>
       `;
     },
     bind: function () {
-      document.getElementById("adm-apply").addEventListener("click", function () {
-        const adm = window.SimState.admin;
+      bindPassEyes();
+      const adm = window.SimState.admin;
+
+      document.getElementById("adm-pass-apply").addEventListener("click", function () {
         const oldP = document.getElementById("adm-old").value;
         const newP = document.getElementById("adm-new").value;
         const cfP = document.getElementById("adm-confirm").value;
-
-        if (newP || cfP) {
-          if (oldP !== adm.password) return alert("Mật khẩu cũ không chính xác!");
-          if (newP !== cfP) return alert("Xác nhận mật khẩu mới không trùng khớp!");
-          const strong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
-          if (!strong.test(newP)) {
-            return alert("Mật khẩu quản trị phải có ít nhất 8 ký tự gồm chữ HOA, chữ thường, chữ số và ký tự đặc biệt!");
-          }
-          adm.password = newP;
+        if (!oldP && !newP && !cfP) return alert("Vui lòng nhập mật khẩu hiện tại và mật khẩu mới!");
+        if (oldP !== adm.password) return alert("Mật khẩu hiện tại không chính xác!");
+        if (newP !== cfP) return alert("Xác nhận mật khẩu không trùng khớp!");
+        const strong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+        if (!strong.test(newP)) {
+          return alert("Mật khẩu phải dài từ 8 ký tự bao gồm chữ hoa, chữ thường, số và các ký tự đặc biệt!");
         }
+        adm.password = newP;
+        window.SimEngine.addLog("[ADMIN] Đã thay đổi mật khẩu quản trị viên (admin).");
+        window.RouterApp.applyWithFeedback("Đã cập nhật mật khẩu quản trị viên!");
+      });
 
-        window.SimState.device.name = document.getElementById("adm-devname").value.trim() || "ONT_VTGR2239D5BC";
+      document.getElementById("adm-apply").addEventListener("click", function () {
         adm.allowWan = document.getElementById("adm-wan").checked;
         adm.sessionTimeoutMin = parseFloat(document.getElementById("adm-timeout").value);
         adm.httpPort = parseInt(document.getElementById("adm-http").value, 10) || 80;
@@ -711,9 +1023,15 @@
 
         window.RouterApp.resetIdleTimer();
         window.SimEngine.addLog(
-          "[ADMIN] Cập nhật Quản trị (Truy cập WAN: " + (adm.allowWan ? "Bật" : "Khóa") + ", Timeout: " + (adm.sessionTimeoutMin || "Không giới hạn") + " phút)."
+          "[ADMIN] Cập nhật Quản lý truy nhập (WAN: " + (adm.allowWan ? "Bật" : "Tắt") + ", Timeout: " + adm.sessionTimeoutMin + " phút)."
         );
-        window.RouterApp.applyWithFeedback("Đã lưu thiết lập Quản trị hệ thống!");
+        window.RouterApp.applyWithFeedback("Đã lưu thiết lập Quản lý truy nhập!");
+      });
+
+      document.getElementById("adm-devname-apply").addEventListener("click", function () {
+        window.SimState.device.name = document.getElementById("adm-devname").value.trim() || "ONT_VTGR2239D5BC";
+        window.SimEngine.addLog("[ADMIN] Đổi tên thiết bị thành " + window.SimState.device.name + ".");
+        window.RouterApp.applyWithFeedback("Đã lưu Tên thiết bị!");
       });
     }
   };
@@ -722,52 +1040,59 @@
   // 19. Bảo dưỡng -> Uplink Mirroring (/cgi-bin/tools-wan2lan.asp)
   // --------------------------------------------------------------------------
   window.RouterPages["tools-wan2lan"] = {
-    title: "Uplink Mirroring (Port Mirroring cho Wireshark)",
+    title: "Cài đặt Uplink Mirroring",
     group: "Bảo dưỡng",
     cgi: "/cgi-bin/tools-wan2lan.asp",
     render: function () {
       const mir = window.SimState.tools.mirroring;
       return `
-        <div class="vht-notice">
-          <strong>Uplink Mirroring:</strong> Sao chép luồng gói tin đi qua cổng quang Uplink (PON/WAN) ra một cổng vật lý <code>LAN1 – LAN4</code> để kỹ thuật viên hoặc sinh viên cắm Laptop bắt gói tin phân tích bằng phần mềm <strong>Wireshark</strong>.
-        </div>
-        <div class="vht-card">
-          <div class="vht-card-header">Cấu hình sao chép gói tin cổng quang xuống cổng LAN</div>
-          <div class="vht-card-body">
+        <div class="vht-widget">
+          <header class="vht-widget-title">Cài đặt Uplink Mirroring</header>
+          <div class="vht-card">
             <table class="form-table">
-              <tr><th>Kích hoạt Uplink Mirroring:</th><td><label class="check-item"><input type="checkbox" id="mir-en" ${mir.enabled ? "checked" : ""} /> <strong>Bật sao chép luồng gói tin</strong></label></td></tr>
               <tr>
-                <th>Hướng bắt gói (Direction):</th>
-                <td>
-                  <select class="vht-select" id="mir-dir">
-                    <option value="Ingress & Egress (Cả thu và phát)">Ingress &amp; Egress (Cả hai chiều thu và phát)</option>
-                    <option value="Ingress (Chiều thu từ WAN)">Ingress (Chỉ chiều thu từ WAN)</option>
-                    <option value="Egress (Chiều phát ra WAN)">Egress (Chỉ chiều phát ra WAN)</option>
-                  </select>
-                </td>
+                <th>Kích hoạt</th>
+                <td>${swHtml("mir-en", mir.enabled)}</td>
               </tr>
               <tr>
-                <th>Cổng LAN đích (Mirror Destination Port):</th>
+                <th>Mirrored Port</th>
                 <td>
-                  <select class="vht-select" id="mir-port">
-                    ${["LAN1", "LAN2", "LAN3", "LAN4"].map((p) => `<option value="${p}" ${mir.destPort === p ? "selected" : ""}>${p}</option>`).join("")}
-                  </select>
+                  <div class="check-grid">
+                    ${["LAN1", "LAN2", "LAN3", "LAN4"]
+                      .map(
+                        (p) =>
+                          `<label class="check-item"><input type="checkbox" class="mir-port-chk" value="${p}" ${mir.destPort === p ? "checked" : ""} /> ${p}</label>`
+                      )
+                      .join("")}
+                  </div>
                 </td>
               </tr>
             </table>
-            <div class="btn-row"><button class="btn-vht" id="mir-apply">ÁP DỤNG</button></div>
+            <div class="btn-row center">
+              <button type="button" class="btn-vht" id="mir-apply">ÁP DỤNG</button>
+            </div>
           </div>
         </div>
       `;
     },
     bind: function () {
+      document.querySelectorAll(".mir-port-chk").forEach(function (chk) {
+        chk.addEventListener("change", function () {
+          if (chk.checked) {
+            document.querySelectorAll(".mir-port-chk").forEach(function (other) {
+              if (other !== chk) other.checked = false;
+            });
+          }
+        });
+      });
+
       document.getElementById("mir-apply").addEventListener("click", function () {
         const mir = window.SimState.tools.mirroring;
         mir.enabled = document.getElementById("mir-en").checked;
-        mir.direction = document.getElementById("mir-dir").value;
-        mir.destPort = document.getElementById("mir-port").value;
+        const sel = document.querySelector(".mir-port-chk:checked");
+        mir.destPort = sel ? sel.value : "LAN1";
         window.SimEngine.addLog("[MIRRORING] Uplink Mirroring: " + (mir.enabled ? "Bật -> " + mir.destPort : "Tắt") + ".");
-        window.RouterApp.applyWithFeedback("Đã lưu cấu hình Uplink Mirroring!");
+        window.RouterApp.applyWithFeedback("Đã lưu cài đặt Uplink Mirroring!");
       });
     }
   };
@@ -776,74 +1101,68 @@
   // 20. Bảo dưỡng -> Giờ hệ thống (/cgi-bin/tools-time.asp)
   // --------------------------------------------------------------------------
   window.RouterPages["tools-time"] = {
-    title: "Giờ hệ thống (NTP / SNTP Time Synchronization)",
+    title: "Giờ hệ thống",
     group: "Bảo dưỡng",
     cgi: "/cgi-bin/tools-time.asp",
     render: function () {
       const adm = window.SimState.admin;
       const nowStr = window.SimEngine.formatDateTime(window.SimEngine.nowRouterDate());
       return `
-        <div class="vht-card">
-          <div class="vht-card-header">
-            <span>Đồng bộ thời gian thực qua máy chủ chuẩn quốc tế NTP</span>
-            <div>
-              <button type="button" class="btn-vht secondary small" id="ntp-plus1m">⏩ Tua thử +1 Phút</button>
-              <button type="button" class="btn-vht outline small" id="ntp-reset-real">🔄 Khớp lại giờ máy tính</button>
-            </div>
-          </div>
-          <div class="vht-card-body">
+        <div class="vht-widget">
+          <header class="vht-widget-title">Giờ hệ thống</header>
+          <div class="vht-card">
             <table class="form-table">
               <tr>
-                <th>Giờ hệ thống hiện tại:</th>
-                <td><strong id="tools-live-clock" style="font-size:14.5px;color:#16a34a;">${esc(nowStr)}</strong></td>
+                <th>Giờ hệ thống</th>
+                <td><span id="tools-live-clock">${esc(nowStr)}</span></td>
               </tr>
               <tr>
-                <th>Tự động đồng bộ NTP:</th>
-                <td><label class="check-item"><input type="checkbox" id="ntp-en" ${adm.ntpEnabled ? "checked" : ""} /> <strong>Tự động đồng bộ thời gian với NTP Server qua Internet</strong></label></td>
+                <th>Tự động đồng bộ với máy chủ NTP</th>
+                <td>${swHtml("ntp-en", adm.ntpEnabled)}</td>
               </tr>
               <tr>
-                <th>Múi giờ (Time Zone):</th>
+                <th>Chọn giao diện</th>
                 <td>
-                  <select class="vht-select" id="ntp-tz">
-                    <option value="(GMT+07:00) Bangkok, Hanoi, Jakarta" selected>(GMT+07:00) Bangkok, Hanoi, Jakarta</option>
-                    <option value="(GMT+00:00) UTC">(GMT+00:00) UTC</option>
-                    <option value="(GMT+08:00) Singapore, Taipei">(GMT+08:00) Singapore, Taipei</option>
+                  <select class="vht-select" id="ntp-iface">
+                    <option value="WAN">WAN</option>
+                    <option value="LAN">LAN</option>
                   </select>
                 </td>
               </tr>
-              <tr><th>Máy chủ NTP 1 (Primary):</th><td><input type="text" class="vht-input" id="ntp-s1" value="${esc(adm.ntp1)}" /></td></tr>
-              <tr><th>Máy chủ NTP 2 (Secondary):</th><td><input type="text" class="vht-input" id="ntp-s2" value="${esc(adm.ntp2)}" /></td></tr>
+              <tr>
+                <th>Máy chủ SNTP chính</th>
+                <td><input type="text" class="vht-input" id="ntp-s1" value="${esc(adm.ntp1)}" /></td>
+              </tr>
+              <tr>
+                <th>Máy chủ SNTP phụ</th>
+                <td><input type="text" class="vht-input" id="ntp-s2" value="${esc(adm.ntp2)}" /></td>
+              </tr>
+              <tr>
+                <th>Múi giờ</th>
+                <td>
+                  <select class="vht-select" id="ntp-tz">
+                    <option value="(GMT+07:00) Bangkok, Hanoi, Jakarta" selected>(GMT+07:00) Bangkok, Hanoi, Jakarta</option>
+                    <option value="(GMT+00:00) Greenwich Mean Time: Dublin, Edinburgh, Lisbon, London">(GMT+00:00) Greenwich Mean Time: Dublin, Edinburgh, Lisbon, London</option>
+                    <option value="(GMT+08:00) Beijing, Chongqing, Hong Kong, Urumqi">(GMT+08:00) Beijing, Chongqing, Hong Kong, Urumqi</option>
+                  </select>
+                </td>
+              </tr>
             </table>
-            <div class="btn-row">
-              <button class="btn-vht" id="ntp-apply">ÁP DỤNG &amp; ĐỒNG BỘ NGAY</button>
+            <div class="btn-row center">
+              <button type="button" class="btn-vht" id="ntp-apply">ÁP DỤNG</button>
             </div>
           </div>
         </div>
       `;
     },
     bind: function () {
-      document.getElementById("ntp-plus1m").addEventListener("click", function () {
-        window.SimState.admin.clockOffsetSec = (window.SimState.admin.clockOffsetSec || 0) + 60;
-        window.SimEngine.reconcileClients();
-        window.SimEngine.saveState();
-        window.RouterApp.renderCurrentPage();
-        window.LabUI.render();
-      });
-      document.getElementById("ntp-reset-real").addEventListener("click", function () {
-        window.SimState.admin.clockOffsetSec = 0;
-        window.SimEngine.reconcileClients();
-        window.SimEngine.saveState();
-        window.RouterApp.showToast("Đã đồng bộ lại đúng giờ thực tế trên máy tính!");
-        window.RouterApp.renderCurrentPage();
-        window.LabUI.render();
-      });
       document.getElementById("ntp-apply").addEventListener("click", function () {
         const adm = window.SimState.admin;
         adm.ntpEnabled = document.getElementById("ntp-en").checked;
         adm.ntp1 = document.getElementById("ntp-s1").value.trim() || "pool.ntp.org";
         adm.ntp2 = document.getElementById("ntp-s2").value.trim() || "2.vn.pool.ntp.org";
         window.SimEngine.addLog("[NTP] Đồng bộ giờ thành công với " + adm.ntp1 + " (GMT+07:00).");
-        window.RouterApp.applyWithFeedback("Đã đồng bộ giờ hệ thống qua NTP (" + adm.ntp1 + ")!");
+        window.RouterApp.applyWithFeedback("Đã lưu cấu hình Giờ hệ thống!");
       });
     }
   };
@@ -858,20 +1177,21 @@
     render: function () {
       const dev = window.SimState.device;
       return `
-        <div class="vht-card">
-          <div class="vht-card-header">Kiểm tra &amp; Cập nhật phần mềm hệ thống (Firmware Upgrade)</div>
-          <div class="vht-card-body">
+        <div class="vht-widget">
+          <header class="vht-widget-title">Nâng cấp Firmware</header>
+          <div class="vht-card">
             <table class="form-table">
-              <tr><th>Mã thiết bị (Model):</th><td><strong>${esc(dev.model)}</strong></td></tr>
-              <tr><th>Phiên bản Phần cứng:</th><td>${esc(dev.hwVersion)}</td></tr>
-              <tr><th>Phiên bản Firmware hiện tại:</th><td><span class="badge-pill green">${esc(dev.firmware)}</span></td></tr>
               <tr>
-                <th>Tập tin Firmware mới:</th>
+                <th>Phiên bản Firmware hiện tại</th>
+                <td><strong>${esc(dev.firmware)}</strong></td>
+              </tr>
+              <tr>
+                <th></th>
                 <td><input type="file" id="fw-file" accept=".bin,.trx,.img" /></td>
               </tr>
             </table>
-            <div class="btn-row">
-              <button class="btn-vht" id="fw-btn-upg">NÂNG CẤP FIRMWARE</button>
+            <div class="btn-row center">
+              <button type="button" class="btn-vht" id="fw-btn-upg">NÂNG CẤP</button>
             </div>
           </div>
         </div>
@@ -881,78 +1201,64 @@
       document.getElementById("fw-btn-upg").addEventListener("click", function () {
         const f = document.getElementById("fw-file");
         if (!f.files || f.files.length === 0) {
-          return alert("Vui lòng chọn tập tin Firmware (.bin / .img) từ nhà sản xuất VHT trước khi bấm Nâng cấp!");
+          return alert("Vui lòng chọn tập tin Firmware trước khi bấm NÂNG CẤP!");
         }
-        alert("Bản mô phỏng: Phiên bản V1302250508 hiện đã là bản chuẩn mới nhất cho kỳ thực hành!");
+        alert("Phiên bản V1302250508 hiện đã là phiên bản mới nhất!");
       });
     }
   };
 
   // --------------------------------------------------------------------------
   // 22. Bảo dưỡng -> Cấu hình (/cgi-bin/tools-config.asp)
-  //     ALL 4 EXACT OPTIONS FOR TV1 (SAO LƯU) & TV6 (KHÔI PHỤC)!
   // --------------------------------------------------------------------------
   window.RouterPages["tools-config"] = {
-    title: "Quản lý Cấu hình (Sao lưu & Khôi phục — 4 Tùy chọn)",
+    title: "Cấu hình",
     group: "Bảo dưỡng",
     cgi: "/cgi-bin/tools-config.asp",
     render: function () {
-      const hasBackupInMem = !!localStorage.getItem(window.SimEngine.BACKUP_KEY);
-      const hasPreResetSnap = !!localStorage.getItem(window.SimEngine.SNAPSHOT_KEY);
-
       return `
-        <div class="vht-notice">
-          Trang <strong>Bảo dưỡng → Cấu hình</strong> cung cấp đầy đủ <strong>4 nút thao tác</strong> đặc trưng trên Firmware <code>V1302250508</code> của <code>vGP-42X6V1</code> (Sao lưu ra file, Khôi phục từ file, Hoàn tác trước lần Reset gần nhất, và Reset mềm về mặc định xuất xưởng).
-        </div>
-
-        <div class="vht-card">
-          <div class="vht-card-header">1. Sao lưu cấu hình hiện tại ra máy tính</div>
-          <div class="vht-card-body">
-            <p style="margin-bottom:10px;color:#334155;">
-              Xuất toàn bộ cài đặt hiện tại của gia đình (Tên Wi-Fi <code>${esc(window.SimState.wifi24.ssids[0].ssid)}</code>, mật khẩu, WAN, DHCP, luật bảo mật...) thành tập tin lưu về máy tính trước khi bấm Reset cứng.
-            </p>
-            <button type="button" class="btn-vht" id="cfg-btn-backup">SAO LƯU</button>
-          </div>
-        </div>
-
-        <div class="vht-card">
-          <div class="vht-card-header">2. Khôi phục cấu hình từ tập tin đã sao lưu</div>
-          <div class="vht-card-body">
-            <table class="form-table">
-              <tr>
-                <th>Chọn tập tin cấu hình (.cfg / .json):</th>
-                <td><input type="file" id="cfg-file-input" accept=".cfg,.json,.xml" /></td>
-              </tr>
-            </table>
-            <div class="btn-row">
-              <button type="button" class="btn-vht" id="cfg-btn-restore-file">KHÔI PHỤC (TỪ TẬP TIN)</button>
-              ${
-                hasBackupInMem
-                  ? `<button type="button" class="btn-vht outline" id="cfg-btn-restore-mem" title="Tiện ích mô phỏng: Nạp nhanh ngay bản Sao lưu gia đình LongGiang không cần tìm file trên ổ đĩa">⚡ Nạp nhanh bản Sao lưu gốc 'LongGiang'</button>`
-                  : ""
-              }
+        <!-- Widget 1: Sao lưu cấu hình -->
+        <div class="vht-widget">
+          <header class="vht-widget-title">Sao lưu cấu hình</header>
+          <div class="vht-card">
+            <div class="btn-row center" style="margin-top:6px;">
+              <button type="button" class="btn-vht" id="cfg-btn-backup">SAO LƯU</button>
             </div>
           </div>
         </div>
 
-        <div class="vht-card">
-          <div class="vht-card-header">3. Khôi phục về bản lưu tự động ngay trước lần Khôi phục mặc định gần nhất</div>
-          <div class="vht-card-body">
-            <p style="margin-bottom:10px;color:#334155;">
-              Tính năng cứu hộ thông minh của Firmware Viettel: Giúp <strong>Hoàn tác (Undo)</strong> nếu người dùng lỡ tay bấm Reset nhầm mà chưa kịp tải file sao lưu về máy.
-              ${hasPreResetSnap ? '<span class="badge-pill green">Đang có bản chụp tự động trước lần Reset</span>' : '<span class="badge-pill gray">Chưa có lịch sử Reset trước đó</span>'}
-            </p>
-            <button type="button" class="btn-vht secondary" id="cfg-btn-undo-reset">KHÔI PHỤC (BẢN TRƯỚC LẦN RESET GẦN NHẤT)</button>
+        <!-- Widget 2: Khôi phục cấu hình -->
+        <div class="vht-widget">
+          <header class="vht-widget-title">Khôi phục cấu hình</header>
+          <div class="vht-card">
+            <p style="margin-bottom:14px;color:#2e2e2e;">Để khôi phục lại cấu hình đã sao lưu trước đó, chọn tập tin và bấm KHÔI PHỤC.</p>
+            <div style="margin-bottom:14px;">
+              <input type="file" id="cfg-file-input" accept=".cfg,.json,.xml" />
+            </div>
+            <div class="btn-row center">
+              <button type="button" class="btn-vht" id="cfg-btn-restore-file">KHÔI PHỤC</button>
+            </div>
           </div>
         </div>
 
-        <div class="vht-card">
-          <div class="vht-card-header">4. Khôi phục hoàn toàn về mặc định nhà sản xuất (Reset mềm)</div>
-          <div class="vht-card-body">
-            <p style="margin-bottom:10px;color:#991b1b;">
-              Xóa sạch mọi cấu hình người dùng và đưa thiết bị trở về đúng thông số in trên tem mặt đáy (SSID: <code>VIETTEL_39D5BC</code> / Pass: <code>123456a@</code>, Admin: <code>admin</code> / <code>VTGR2239D5BC</code>; riêng WAN <code>1_INTERNET_R_VID_35</code> tự đồng bộ lại qua OMCI).
-            </p>
-            <button type="button" class="btn-vht danger" id="cfg-btn-factory">KHÔI PHỤC HOÀN TOÀN</button>
+        <!-- Widget 3: Khôi phục cài đặt gần nhất -->
+        <div class="vht-widget">
+          <header class="vht-widget-title">Khôi phục cài đặt gần nhất</header>
+          <div class="vht-card">
+            <p style="margin-bottom:14px;color:#2e2e2e;">Khôi phục lại cài đặt trước lần "Khôi phục mặc định" gần nhất.</p>
+            <div class="btn-row center">
+              <button type="button" class="btn-vht" id="cfg-btn-undo-reset">KHÔI PHỤC</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Widget 4: Khôi phục mặc định -->
+        <div class="vht-widget">
+          <header class="vht-widget-title">Khôi phục mặc định</header>
+          <div class="vht-card">
+            <div class="btn-row center" style="margin-top:6px;">
+              <button type="button" class="btn-vht" id="cfg-btn-factory">KHÔI PHỤC HOÀN TOÀN</button>
+            </div>
           </div>
         </div>
       `;
@@ -976,14 +1282,13 @@
 
         window.SimEngine.addLog("[CONFIG] Đã xuất file SAO LƯU cấu hình (romfile_vGP-42X6V1_backup.cfg).");
         window.RouterApp.showToast("Đã tải file sao lưu 'romfile_vGP-42X6V1_backup.cfg' về máy tính!");
-        window.RouterApp.renderCurrentPage();
       });
 
       function applyRestoredObject(parsed, label) {
         if (!parsed || !parsed.wifi24 || !parsed.lan) {
-          return alert("Tập tin cấu hình không đúng định dạng bản sao lưu mô phỏng vGP-42X6V1!");
+          return alert("Tập tin cấu hình không hợp lệ!");
         }
-        window.RouterApp.runRebootSimulation("Đang nạp lại file cấu hình & khởi động lại dịch vụ mạng...", function () {
+        window.RouterApp.runRebootSimulation("Đang nạp lại file cấu hình & khởi động lại thiết bị...", function () {
           window.SimState = parsed;
           window.SimEngine.addLog("[CONFIG] Đã KHÔI PHỤC thành công cấu hình từ " + label + " (SSID: " + parsed.wifi24.ssids[0].ssid + ").");
           window.SimEngine.saveState();
@@ -995,7 +1300,7 @@
       document.getElementById("cfg-btn-restore-file").addEventListener("click", function () {
         const inp = document.getElementById("cfg-file-input");
         if (!inp.files || inp.files.length === 0) {
-          return alert("Vui lòng bấm 'Chọn tập tin' và trỏ tới file .cfg đã sao lưu ở Phân cảnh 1!");
+          return alert("Vui lòng chọn tập tin cấu hình trước khi bấm KHÔI PHỤC!");
         }
         const reader = new FileReader();
         reader.onload = function (ev) {
@@ -1003,37 +1308,27 @@
             const parsed = JSON.parse(ev.target.result);
             applyRestoredObject(parsed, "file " + inp.files[0].name);
           } catch (err) {
-            // If user picked the real binary/encrypted router romfile.cfg from workspace, gracefully restore family LongGiang config!
             const fam = window.SimEngine.createFamilyPreResetConfig(window.SimState.coach.groupSsid);
-            applyRestoredObject(fam, "tập tin romfile gốc gia đình (" + inp.files[0].name + ")");
+            applyRestoredObject(fam, "tập tin romfile (" + inp.files[0].name + ")");
           }
         };
         reader.readAsText(inp.files[0]);
       });
 
-      const memBtn = document.getElementById("cfg-btn-restore-mem");
-      if (memBtn) {
-        memBtn.addEventListener("click", function () {
-          const raw = localStorage.getItem(window.SimEngine.BACKUP_KEY);
-          if (!raw) return alert("Chưa có bản sao lưu trong bộ nhớ!");
-          applyRestoredObject(JSON.parse(raw), "bản Sao lưu gốc gia đình");
-        });
-      }
-
       document.getElementById("cfg-btn-undo-reset").addEventListener("click", function () {
         const raw = localStorage.getItem(window.SimEngine.SNAPSHOT_KEY);
         if (!raw) {
-          return alert("Chưa có bản ghi nào trước lần Reset mặc định! (Tính năng này dùng sau khi bạn đã từng bấm Reset ít nhất 1 lần).");
+          return alert("Chưa có bản ghi trước lần Khôi phục mặc định gần nhất!");
         }
-        applyRestoredObject(JSON.parse(raw), "bản tự động lưu trước lần Reset gần nhất");
+        applyRestoredObject(JSON.parse(raw), "bản trước lần Khôi phục mặc định gần nhất");
       });
 
       document.getElementById("cfg-btn-factory").addEventListener("click", function () {
-        if (!confirm("Bạn có chắc chắn muốn KHÔI PHỤC HOÀN TOÀN về cài đặt gốc nhà sản xuất (Reset mềm)?")) return;
-        window.RouterApp.runRebootSimulation("Đang xóa cấu hình & Khôi phục mặc định xuất xưởng (VIETTEL_39D5BC)...", function () {
-          window.SimEngine.performFactoryReset("Reset mềm trên Web UI");
+        if (!confirm("Bạn có chắc chắn muốn KHÔI PHỤC HOÀN TOÀN về cài đặt mặc định?")) return;
+        window.RouterApp.runRebootSimulation("Đang xóa cấu hình & Khôi phục mặc định (VIETTEL_39D5BC)...", function () {
+          window.SimEngine.performFactoryReset("Khôi phục mặc định trên Web UI");
           window.RouterApp.renderAll();
-          window.RouterApp.showToast("Đã Reset về mặc định xuất xưởng! Sóng Wi-Fi hiện tại: VIETTEL_39D5BC.");
+          window.RouterApp.showToast("Đã Khôi phục mặc định! Sóng Wi-Fi hiện tại: VIETTEL_39D5BC.");
         });
       });
     }
@@ -1043,100 +1338,116 @@
   // 23. Bảo dưỡng -> Chẩn đoán mạng (/cgi-bin/tools-diagnostic.asp)
   // --------------------------------------------------------------------------
   window.RouterPages["tools-diagnostic"] = {
-    title: "Chẩn đoán mạng (Auto Check, Ping & Traceroute)",
+    title: "Chẩn đoán mạng",
     group: "Bảo dưỡng",
     cgi: "/cgi-bin/tools-diagnostic.asp",
-    lastOutput: "Sẵn sàng. Chọn công cụ Ping hoặc Traceroute, nhập địa chỉ đích (ví dụ 8.8.8.8 hoặc fit.hcmus.edu.vn) rồi bấm CHẨN ĐOÁN.",
+    lastOutput: "",
+    diagTool: "Ping",
     render: function () {
       const fault = window.SimState.device.fiberFault;
       const lanOk = window.SimState.simDevices.laptopObs.connMode === "LAN1";
+      const okMark = `<span class="text-green" style="font-size:16px;">✔</span>`;
+      const errMark = `<span class="text-red" style="font-size:16px;">✖</span>`;
 
       return `
-        <div class="vht-card">
-          <div class="vht-card-header">
-            <span>1. Kiểm tra tự động 4 tầng kết nối hệ thống</span>
-            <button type="button" class="btn-vht small" id="diag-recheck">KIỂM TRA LẠI</button>
-          </div>
-          <div class="vht-card-body">
-            <table class="data-table">
-              <thead><tr><th>Hạng mục kiểm tra</th><th>Kết quả</th></tr></thead>
-              <tbody>
-                <tr>
-                  <td>Kiểm tra kết nối cổng Ethernet LAN</td>
-                  <td>${lanOk ? '<span class="badge-pill green">PASS (LAN1 Up 1000 Mbps)</span>' : '<span class="badge-pill gray">WARN (Không cắm dây LAN1)</span>'}</td>
-                </tr>
-                <tr>
-                  <td>Kiểm tra đồng bộ MAC xPON</td>
-                  <td>${fault ? '<span class="badge-pill red">FAIL (LOS)</span>' : '<span class="badge-pill green">PASS</span>'}</td>
-                </tr>
-                <tr>
-                  <td>Kiểm tra kết nối quang xPON &amp; OMCI (O5)</td>
-                  <td>${fault ? '<span class="badge-pill red">FAIL (Mất tín hiệu ánh sáng)</span>' : '<span class="badge-pill green">PASS (O5 Associated)</span>'}</td>
-                </tr>
-                <tr>
-                  <td>Kiểm tra kết nối máy chủ DNS nhà mạng (116.97.90.124)</td>
-                  <td>${fault ? '<span class="badge-pill red">FAIL</span>' : '<span class="badge-pill green">PASS</span>'}</td>
-                </tr>
-              </tbody>
+        <div class="vht-widget">
+          <header class="vht-widget-title">Chẩn đoán mạng</header>
+          <div class="vht-card">
+            <table class="form-table" style="margin-bottom:20px;">
+              <tr>
+                <th>Tên kết nối</th>
+                <td>
+                  <select class="vht-select" id="diag-wan">
+                    <option value="1_INTERNET_R_VID_35">1_INTERNET_R_VID_35</option>
+                  </select>
+                </td>
+              </tr>
+              <tr>
+                <th>Kiểm tra kết nối Ethernet LAN</th>
+                <td>${lanOk ? okMark : errMark}</td>
+              </tr>
+              <tr>
+                <th>Kiểm tra trạng thái MAC xPON</th>
+                <td>${fault ? errMark : okMark}</td>
+              </tr>
+              <tr>
+                <th>Kiểm tra trạng thái kết nối xPON</th>
+                <td>${fault ? errMark : okMark}</td>
+              </tr>
             </table>
-          </div>
-        </div>
 
-        <div class="vht-card">
-          <div class="vht-card-header">2. Công cụ Chẩn đoán Ping &amp; Traceroute trực tiếp trên Router</div>
-          <div class="vht-card-body">
+            <legend class="vht-legend">Cấu hình</legend>
             <table class="form-table">
               <tr>
-                <th>Công cụ chẩn đoán:</th>
+                <th>Công cụ chẩn đoán</th>
                 <td>
                   <div class="check-grid">
-                    <label class="check-item"><input type="radio" name="diag-tool" value="Ping" checked /> <strong>Ping</strong> (Đo độ trễ khứ hồi ms &amp; tỷ lệ mất gói %)</label>
-                    <label class="check-item"><input type="radio" name="diag-tool" value="Traceroute" /> <strong>Traceroute</strong> (Liệt kê chi tiết từng trạm Router trung gian / từng Hop)</label>
+                    <label class="check-item"><input type="radio" name="diag-tool" value="Ping" ${this.diagTool === "Ping" ? "checked" : ""} /> Ping</label>
+                    <label class="check-item"><input type="radio" name="diag-tool" value="Traceroute" ${this.diagTool === "Traceroute" ? "checked" : ""} /> Traceroute</label>
                   </div>
                 </td>
               </tr>
               <tr>
-                <th>Giao diện nguồn WAN:</th>
-                <td><select class="vht-select"><option>1_INTERNET_R_VID_35 (27.68.142.95)</option></select></td>
+                <th>Địa chỉ IP/ Tên miền</th>
+                <td><input type="text" class="vht-input" id="diag-target" value="8.8.8.8" /></td>
+              </tr>
+              ${
+                this.diagTool === "Ping"
+                  ? `
+              <tr>
+                <th>Số lần ping</th>
+                <td><input type="text" class="vht-input short" id="diag-count" value="4" /> <span class="field-hint">(1-10)</span></td>
               </tr>
               <tr>
-                <th>Địa chỉ IP / Tên miền đích:</th>
-                <td>
-                  <input type="text" class="vht-input" id="diag-target" value="8.8.8.8" />
-                  <button type="button" class="btn-icon diag-quick" data-host="8.8.8.8">8.8.8.8</button>
-                  <button type="button" class="btn-icon diag-quick" data-host="google.com">google.com</button>
-                  <button type="button" class="btn-icon diag-quick" data-host="fit.hcmus.edu.vn">fit.hcmus.edu.vn</button>
-                </td>
+                <th>Kích thước gói ping</th>
+                <td><input type="text" class="vht-input short" id="diag-size" value="56" /> <span class="field-hint">(4-1472 Bytes)</span></td>
+              </tr>
+              <tr>
+                <th>Thời hạn gói ping</th>
+                <td><input type="text" class="vht-input short" id="diag-timeout" value="1000" /> <span class="field-hint">(100-2000 Milliseconds)</span></td>
+              </tr>`
+                  : `
+              <tr>
+                <th>TTL tối đa</th>
+                <td><input type="text" class="vht-input short" id="diag-ttl" value="30" /> <span class="field-hint">(2-30)</span></td>
+              </tr>`
+              }
+              <tr>
+                <th></th>
+                <td><button type="button" class="btn-vht small" id="diag-run">Chẩn đoán</button></td>
               </tr>
             </table>
-            <div class="btn-row">
-              <button type="button" class="btn-vht" id="diag-run">CHẨN ĐOÁN</button>
+
+            <div class="diag-console" id="diag-console" style="margin-top:14px;">${esc(this.lastOutput)}</div>
+
+            <div class="btn-row center" style="margin-top:18px;">
+              <button type="button" class="btn-vht" id="diag-recheck">TẢI LẠI</button>
             </div>
-            <div class="diag-console" id="diag-console">${esc(this.lastOutput)}</div>
           </div>
         </div>
       `;
     },
     bind: function () {
       const self = this;
-      document.getElementById("diag-recheck").addEventListener("click", function () {
-        window.RouterApp.showToast("Đã chạy kiểm tra nhanh 4 tầng kết nối!");
-        window.RouterApp.renderCurrentPage();
-      });
 
-      document.querySelectorAll(".diag-quick").forEach(function (b) {
-        b.addEventListener("click", function () {
-          document.getElementById("diag-target").value = b.getAttribute("data-host");
+      document.querySelectorAll('input[name="diag-tool"]').forEach(function (rad) {
+        rad.addEventListener("change", function () {
+          self.diagTool = rad.value;
+          window.RouterApp.renderCurrentPage();
         });
       });
 
+      document.getElementById("diag-recheck").addEventListener("click", function () {
+        window.RouterApp.renderCurrentPage();
+      });
+
       document.getElementById("diag-run").addEventListener("click", function () {
-        const tool = document.querySelector('input[name="diag-tool"]:checked').value;
+        const tool = self.diagTool;
         const host = document.getElementById("diag-target").value.trim() || "8.8.8.8";
         const con = document.getElementById("diag-console");
 
         if (window.SimState.device.fiberFault) {
-          self.lastOutput = tool.toUpperCase() + " " + host + ": Network is unreachable (Cáp quang đang báo lỗi LOS đỏ!)";
+          self.lastOutput = tool.toUpperCase() + " " + host + ": Network is unreachable";
           con.textContent = self.lastOutput;
           return;
         }
@@ -1166,14 +1477,14 @@
               ]
             : [
                 "traceroute to " + host + " (" + resolvedIp + "), 30 hops max, 38 byte packets",
-                " 1  27.68.142.1 (Trạm BRAS/OLT Viettel Khu vực TP.HCM)  2.412 ms  2.185 ms  2.301 ms",
-                " 2  171.255.64.145 (Viettel Metro Core HCM)             3.890 ms  4.012 ms  3.954 ms",
-                " 3  116.97.98.21 (Viettel Backbone Router)              6.512 ms  6.440 ms  6.701 ms",
-                " 4  203.190.170.42 (Tuyến kết nối Quốc tế Viettel IXP) 11.840 ms 12.105 ms 11.930 ms",
-                " 5  72.14.209.130 (Peer Edge Gateway)                  12.604 ms 12.711 ms 12.589 ms",
-                " 6  " + resolvedIp + " (" + host + ")                  13.120 ms 12.980 ms 13.210 ms",
+                " 1  100.99.0.2  2.412 ms  2.185 ms  2.301 ms",
+                " 2  171.255.64.145  3.890 ms  4.012 ms  3.954 ms",
+                " 3  116.97.98.21  6.512 ms  6.440 ms  6.701 ms",
+                " 4  203.190.170.42  11.840 ms 12.105 ms 11.930 ms",
+                " 5  72.14.209.130  12.604 ms 12.711 ms 12.589 ms",
+                " 6  " + resolvedIp + "  13.120 ms 12.980 ms 13.210 ms",
                 "",
-                "Chẩn đoán Traceroute hoàn tất (Đường truyền thông suốt qua 6 chặng / Hops)."
+                "Trace complete."
               ];
 
         let idx = 0;
@@ -1188,7 +1499,7 @@
           }
         }, 160);
 
-        window.SimEngine.addLog("[DIAGNOSTIC] Đã chạy " + tool + " tới " + host + " (0% loss).");
+        window.SimEngine.addLog("[DIAGNOSTIC] Đã chạy " + tool + " tới " + host + ".");
       });
     }
   };
@@ -1197,43 +1508,78 @@
   // 24. Bảo dưỡng -> Bản ghi hệ thống (/cgi-bin/tools-log.asp)
   // --------------------------------------------------------------------------
   window.RouterPages["tools-log"] = {
-    title: "Bản ghi hệ thống (System Log)",
+    title: "Bản ghi hệ thống",
     group: "Bảo dưỡng",
     cgi: "/cgi-bin/tools-log.asp",
+    subTab: "general",
+    detailEnabled: false,
     render: function () {
       const logs = window.SimState.tools.logs || [];
+      const filtered =
+        this.subTab === "pon"
+          ? logs.filter((l) => /PON|GPON|OMCI|WAN|PPPoE/i.test(l))
+          : this.subTab === "wifi"
+          ? logs.filter((l) => /WIFI|SSID|MESH|2\.4G|5G/i.test(l))
+          : logs;
+
       return `
-        <div class="vht-card">
-          <div class="vht-card-header">
-            <span>Nhật ký sự kiện hoạt động của Router (${logs.length} dòng)</span>
-            <div style="display:flex;gap:8px;">
-              <button type="button" class="btn-vht small" id="log-download">TẢI XUỐNG SYSLOG</button>
-              <button type="button" class="btn-vht secondary small" id="log-clear">XÓA BẢN GHI</button>
+        <div class="vht-subtabs">
+          <button type="button" class="vht-subtab ${this.subTab === "general" ? "active" : ""}" data-tab="general">Bản ghi chung</button>
+          <button type="button" class="vht-subtab ${this.subTab === "pon" ? "active" : ""}" data-tab="pon">Bản ghi PON</button>
+          <button type="button" class="vht-subtab ${this.subTab === "wifi" ? "active" : ""}" data-tab="wifi">Bản ghi WiFi</button>
+        </div>
+
+        <div class="vht-widget">
+          <div class="vht-card">
+            <table class="form-table" style="margin-bottom:14px;">
+              <tr>
+                <th>Bản ghi chi tiết</th>
+                <td style="display:flex;align-items:center;gap:18px;">
+                  ${swHtml("log-detail-sw", this.detailEnabled)}
+                  <button type="button" class="btn-vht small" id="log-detail-apply">ÁP DỤNG</button>
+                </td>
+              </tr>
+            </table>
+
+            <div class="diag-console" style="min-height:280px;">${esc((filtered.length ? filtered : logs).join("\n"))}</div>
+
+            <div class="btn-row center" style="gap:14px;margin-top:18px;">
+              <button type="button" class="btn-vht" id="log-reload">TẢI LẠI</button>
+              <button type="button" class="btn-vht" id="log-download">TẢI XUỐNG</button>
             </div>
-          </div>
-          <div class="vht-card-body">
-            <div class="diag-console" style="min-height:300px;color:#e2e8f0;">${esc(logs.join("\n"))}</div>
           </div>
         </div>
       `;
     },
     bind: function () {
+      const self = this;
+      document.querySelectorAll(".vht-subtab").forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          self.subTab = tab.getAttribute("data-tab");
+          window.RouterApp.renderCurrentPage();
+        });
+      });
+
+      document.getElementById("log-detail-apply").addEventListener("click", function () {
+        self.detailEnabled = document.getElementById("log-detail-sw").checked;
+        window.RouterApp.applyWithFeedback("Đã lưu cấu hình Bản ghi chi tiết!");
+      });
+
+      document.getElementById("log-reload").addEventListener("click", function () {
+        window.RouterApp.renderCurrentPage();
+      });
+
       document.getElementById("log-download").addEventListener("click", function () {
         const txt = (window.SimState.tools.logs || []).join("\r\n");
         const blob = new Blob([txt], { type: "text/plain" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "vGP-42X6V1_syslog.txt";
+        a.download = "syslog.txt";
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-      });
-      document.getElementById("log-clear").addEventListener("click", function () {
-        window.SimState.tools.logs = [];
-        window.SimEngine.addLog("[SYSLOG] Đã xóa trống nhật ký hệ thống.");
-        window.RouterApp.renderCurrentPage();
       });
     }
   };
@@ -1242,33 +1588,87 @@
   // 25. Bảo dưỡng -> Khởi động lại (/cgi-bin/tools-reboot.asp)
   // --------------------------------------------------------------------------
   window.RouterPages["tools-reboot"] = {
-    title: "Khởi động lại thiết bị (Soft Reboot)",
+    title: "Khởi động lại",
     group: "Bảo dưỡng",
     cgi: "/cgi-bin/tools-reboot.asp",
+    rebootSchedEn: false,
     render: function () {
+      const days = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
       return `
-        <div class="vht-card">
-          <div class="vht-card-header">Khởi động lại mềm (Soft Reboot)</div>
-          <div class="vht-card-body">
-            <p style="margin-bottom:14px;color:#334155;">
-              Khởi động lại hệ điều hành của Router để giải phóng bộ nhớ RAM và làm mới phiên kết nối quang GPON mà <strong>không</strong> làm mất các cài đặt đã lưu.
-            </p>
-            <button type="button" class="btn-vht" id="btn-soft-reboot">KHỞI ĐỘNG LẠI</button>
+        <!-- Widget 1: Khởi động lại -->
+        <div class="vht-widget">
+          <header class="vht-widget-title">Khởi động lại</header>
+          <div class="vht-card">
+            <p style="margin-bottom:14px;color:#2e2e2e;">Bấm nút BẮT ĐẦU bên dưới để khởi động lại thiết bị.</p>
+            <div class="btn-row center">
+              <button type="button" class="btn-vht" id="btn-soft-reboot">BẮT ĐẦU</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Widget 2: Lập lịch khởi động lại -->
+        <div class="vht-widget">
+          <header class="vht-widget-title">Lập lịch khởi động lại</header>
+          <div class="vht-card">
+            <legend class="vht-legend">Sửa lịch</legend>
+            <table class="form-table">
+              <tr>
+                <th>Kích hoạt</th>
+                <td>${swHtml("rb-sched-en", this.rebootSchedEn)}</td>
+              </tr>
+              <tr>
+                <th>Thời gian khởi động lại</th>
+                <td><input type="text" class="vht-input short" id="rb-sched-time" value="03:00" /></td>
+              </tr>
+              <tr>
+                <th>Định kỳ</th>
+                <td>
+                  <select class="vht-select" id="rb-sched-period">
+                    <option value="weekly">Theo tuần</option>
+                    <option value="monthly">Theo tháng</option>
+                  </select>
+                </td>
+              </tr>
+              <tr>
+                <th>Ngày trong tuần</th>
+                <td>
+                  <div class="table-bordered-radius" style="max-width:460px;">
+                    <table class="data-table">
+                      <thead>
+                        <tr>${days.map((d) => `<th>${d}</th>`).join("")}</tr>
+                      </thead>
+                      <tbody>
+                        <tr>${days.map((d) => `<td><input type="checkbox" checked /></td>`).join("")}</tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </td>
+              </tr>
+            </table>
+            <div class="btn-row center">
+              <button type="button" class="btn-vht" id="rb-sched-apply">ÁP DỤNG</button>
+            </div>
           </div>
         </div>
       `;
     },
     bind: function () {
+      const self = this;
       document.getElementById("btn-soft-reboot").addEventListener("click", function () {
-        if (!confirm("Bạn có muốn khởi động lại Router vGP-42X6V1 ngay bây giờ?")) return;
-        window.RouterApp.runRebootSimulation("Đang khởi động lại thiết bị vGP-42X6V1 (Giữ nguyên cấu hình đã lưu)...", function () {
+        if (!confirm("Bạn có muốn khởi động lại thiết bị ngay bây giờ?")) return;
+        window.RouterApp.runRebootSimulation("Đang khởi động lại thiết bị vGP-42X6V1...", function () {
           window.SimState.device.uptimeSec = 5;
           window.SimState.device.ramUsage = 39;
-          window.SimEngine.addLog("[REBOOT] Thiết bị đã khởi động lại mềm thành công.");
+          window.SimEngine.addLog("[REBOOT] Thiết bị đã khởi động lại thành công.");
           window.SimEngine.saveState();
           window.RouterApp.renderAll();
           window.RouterApp.showToast("Thiết bị vGP-42X6V1 đã khởi động lại hoàn tất!");
         });
+      });
+
+      document.getElementById("rb-sched-apply").addEventListener("click", function () {
+        self.rebootSchedEn = document.getElementById("rb-sched-en").checked;
+        window.RouterApp.applyWithFeedback("Đã lưu Lập lịch khởi động lại!");
       });
     }
   };

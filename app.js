@@ -268,8 +268,12 @@
 
       const main = document.getElementById("vht-main-content");
       main.innerHTML = `
-        <div class="page-title">${pageDef.title}</div>
         <div id="cgi-page-inner">${pageDef.render()}</div>
+        <footer class="vht-footer">
+          <div>Tư vấn bán hàng (miễn phí): <span>18008168</span></div>
+          <div>Báo hỏng (miễn phí): <span>18008119</span></div>
+          <div>© 2021 by VHT. All rights reserved.</div>
+        </footer>
       `;
 
       if (typeof pageDef.bind === "function") {

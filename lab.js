@@ -191,7 +191,9 @@
             <button type="button" class="lab-btn ghost" id="lab-q-fill-ssid" style="margin:0;padding:5px 6px;font-size:11px;">⚡ Điền SSID Nhóm</button>
             <button type="button" class="lab-btn ghost" id="lab-q-fill-mac" style="margin:0;padding:5px 6px;font-size:11px;">📱 Điền MAC ĐT chuẩn ':'</button>
             <button type="button" class="lab-btn ghost" id="lab-q-fill-badmac" style="margin:0;padding:5px 6px;font-size:11px;">⚠️ Thử MAC dấu '-' (Bẫy)</button>
+            <button type="button" class="lab-btn ghost" id="lab-q-nextmin" style="margin:0;padding:5px 6px;font-size:11px;">⏰ Đặt lịch phút kế</button>
             <button type="button" class="lab-btn ghost" id="lab-q-plus1m" style="margin:0;padding:5px 6px;font-size:11px;">⏩ Tua giờ Router +1p</button>
+            <button type="button" class="lab-btn ghost" id="lab-q-restore-mem" style="margin:0;padding:5px 6px;font-size:11px;">♻️ Khôi phục nhanh Gốc</button>
           </div>
         </div>
 
@@ -242,28 +244,93 @@
       });
 
       document.getElementById("lab-q-fill-ssid").addEventListener("click", function () {
-        const b24 = document.getElementById("w24-fill-group");
-        const b5 = document.getElementById("w5-fill-group");
-        if (b24) b24.click();
-        else if (b5) b5.click();
-        else window.RouterApp.showToast("Hãy mở trang Thiết lập Wi-Fi 2.4GHz hoặc 5GHz trước!");
+        const g = window.SimState.coach.groupSsid || "24CLC01-N01";
+        const inp24 = document.getElementById("w24-ssid-name");
+        const inp5 = document.getElementById("w5-ssid-name");
+        const inpHome24 = document.getElementById("qs-ssid-24");
+        if (inp24) {
+          const idx = window.SimState.wifi24.selectedIdx || 1;
+          inp24.value = idx === 1 ? g : g + "_Guest";
+          const enSw = document.getElementById("w24-ssid-enable");
+          if (enSw) enSw.checked = true;
+          window.RouterApp.showToast("Đã điền SSID 2.4GHz: " + inp24.value);
+        } else if (inp5) {
+          const idx = window.SimState.wifi5.selectedIdx || 1;
+          inp5.value = idx === 1 ? g + "_5G" : g + "_5G_" + idx;
+          const enSw = document.getElementById("w5-ssid-enable");
+          if (enSw) enSw.checked = true;
+          window.RouterApp.showToast("Đã điền SSID 5GHz: " + inp5.value);
+        } else if (inpHome24) {
+          inpHome24.value = g;
+          const inpHome5 = document.getElementById("qs-ssid-5");
+          if (inpHome5) inpHome5.value = g + "_5G";
+          window.RouterApp.showToast("Đã điền SSID Nhóm tại trang Cài đặt nhanh!");
+        } else {
+          window.RouterApp.showToast("Hãy mở trang Thiết lập Wi-Fi 2.4GHz, 5GHz hoặc Cài đặt nhanh trước!");
+        }
       });
 
       document.getElementById("lab-q-fill-mac").addEventListener("click", function () {
-        const bLan = document.getElementById("static-fill-phone");
-        const bPc = document.getElementById("pc-fill-colon");
-        if (bLan) bLan.click();
-        else if (bPc) bPc.click();
-        else {
-          if (navigator.clipboard) navigator.clipboard.writeText(window.SimState.simDevices.phone.mac);
-          window.RouterApp.showToast("Đã copy MAC Điện thoại: " + window.SimState.simDevices.phone.mac);
+        const mac = window.SimState.simDevices.phone.mac;
+        const lanMac = document.getElementById("static-mac-in");
+        const pcMac = document.getElementById("pc-f-mac");
+        if (lanMac) {
+          lanMac.value = mac;
+          const lanIp = document.getElementById("static-ip-in");
+          if (lanIp && !lanIp.value) lanIp.value = "192.168.1.150";
+          window.RouterApp.showToast("Đã điền MAC chuẩn ':' (" + mac + ") vào Bảng cấp phát IP tĩnh!");
+        } else if (pcMac) {
+          pcMac.value = mac;
+          window.RouterApp.showToast("Đã điền MAC chuẩn ':' (" + mac + ") vào Kiểm soát con cái!");
+        } else {
+          if (navigator.clipboard) navigator.clipboard.writeText(mac);
+          window.RouterApp.showToast("Đã copy MAC Điện thoại: " + mac + " (Mở Thiết lập LAN hoặc Kiểm soát con cái để điền tự động)");
         }
       });
 
       document.getElementById("lab-q-fill-badmac").addEventListener("click", function () {
-        const bPcBad = document.getElementById("pc-fill-hyphen");
-        if (bPcBad) bPcBad.click();
-        else window.RouterApp.showToast("Hãy mở trang Kiểm soát con cái -> bấm THÊM trước!");
+        const badMac = window.SimState.simDevices.phone.mac.replace(/:/g, "-");
+        const pcMac = document.getElementById("pc-f-mac");
+        const lanMac = document.getElementById("static-mac-in");
+        if (pcMac) {
+          pcMac.value = badMac;
+          window.RouterApp.showToast("Đã điền MAC dấu gạch ngang (" + badMac + "). Bấm ÁP DỤNG để xem cảnh báo lỗi Firmware!");
+        } else if (lanMac) {
+          lanMac.value = badMac;
+          window.RouterApp.showToast("Đã điền MAC dấu gạch ngang (" + badMac + "). Bấm THÊM để xem cảnh báo lỗi!");
+        } else {
+          window.RouterApp.showToast("Hãy mở Kiểm soát con cái (bấm THÊM) hoặc Thiết lập LAN trước!");
+        }
+      });
+
+      document.getElementById("lab-q-nextmin").addEventListener("click", function () {
+        const startIn = document.getElementById("wsch-start");
+        const endIn = document.getElementById("wsch-end");
+        const enIn = document.getElementById("wsch-en");
+        if (!startIn || !endIn) {
+          window.RouterApp.ensureLoggedIn();
+          window.RouterApp.navigate("apps-wifischeduling");
+        }
+        setTimeout(function () {
+          const now = window.SimEngine.nowRouterDate();
+          const pad = function (n) {
+            return String(n).padStart(2, "0");
+          };
+          const d1 = new Date(now.getTime() + 60000);
+          const d2 = new Date(now.getTime() + 6 * 60000);
+          const sEl = document.getElementById("wsch-start");
+          const eEl = document.getElementById("wsch-end");
+          const enEl = document.getElementById("wsch-en");
+          if (sEl && eEl) {
+            sEl.value = pad(d1.getHours()) + ":" + pad(d1.getMinutes());
+            eEl.value = pad(d2.getHours()) + ":" + pad(d2.getMinutes());
+            if (enEl) enEl.checked = true;
+            document.querySelectorAll(".wsch-day").forEach(function (c) {
+              c.checked = true;
+            });
+            window.RouterApp.showToast("Đã điền giờ tắt Wi-Fi ở phút kế tiếp (" + sEl.value + " -> " + eEl.value + "). Bấm ÁP DỤNG rồi bấm '⏩ Tua giờ Router +1p'!");
+          }
+        }, 50);
       });
 
       document.getElementById("lab-q-plus1m").addEventListener("click", function () {
@@ -273,6 +340,18 @@
         window.RouterApp.showToast("Đã tua nhanh đồng hồ Router +1 phút!");
         window.RouterApp.renderCurrentPage();
         self.render();
+      });
+
+      document.getElementById("lab-q-restore-mem").addEventListener("click", function () {
+        const raw = localStorage.getItem(window.SimEngine.BACKUP_KEY);
+        const fam = raw ? JSON.parse(raw) : window.SimEngine.createFamilyPreResetConfig(window.SimState.coach.groupSsid);
+        window.RouterApp.runRebootSimulation("Đang nạp lại file cấu hình & khởi động lại thiết bị...", function () {
+          window.SimState = fam;
+          window.SimEngine.addLog("[CONFIG] Đã KHÔI PHỤC thành công cấu hình gốc gia đình (SSID: " + fam.wifi24.ssids[0].ssid + ").");
+          window.SimEngine.saveState();
+          window.RouterApp.renderAll();
+          window.RouterApp.showToast("Khôi phục thành công! Sóng '" + fam.wifi24.ssids[0].ssid + "' đã hoạt động trở lại.");
+        });
       });
 
       document.querySelectorAll(".tv-btn").forEach(function (b) {
