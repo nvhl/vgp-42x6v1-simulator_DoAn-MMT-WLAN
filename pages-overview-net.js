@@ -1,5 +1,6 @@
 /* ==========================================================================
    pages-overview-net.js — Renderers & Handlers for Overview (4 pages) & Mạng (2 pages)
+   Matches Real VHT ONT Layout (Two-column cards, Toggle switches, Eye password inputs)
    ========================================================================== */
 
 (function () {
@@ -13,19 +14,54 @@
       .replace(/"/g, "&quot;");
   }
 
-  function formatUptime(sec) {
-    const d = Math.floor(sec / 86400);
-    const h = Math.floor((sec % 86400) / 3600);
+  function formatHms(sec) {
+    const pad = (n) => String(n).padStart(2, "0");
+    const h = Math.floor(sec / 3600);
     const m = Math.floor((sec % 3600) / 60);
     const s = sec % 60;
-    return d + " ngày " + h + " giờ " + m + " phút " + s + " giây";
+    return pad(h) + ":" + pad(m) + ":" + pad(s);
+  }
+
+  function formatVnClock(d) {
+    const pad = (n) => String(n).padStart(2, "0");
+    return (
+      pad(d.getHours()) +
+      ":" +
+      pad(d.getMinutes()) +
+      " " +
+      pad(d.getDate()) +
+      "/" +
+      pad(d.getMonth() + 1) +
+      "/" +
+      d.getFullYear() +
+      " GMT+07:00"
+    );
+  }
+
+  function pwdInputHtml(id, val, placeholder) {
+    return `
+      <div class="pwd-wrap">
+        <input type="password" class="vht-input" id="${id}" value="${esc(val)}" ${placeholder ? `placeholder="${esc(placeholder)}"` : ""} />
+        <button type="button" class="pwd-eye" data-target="${id}" title="Hiện/Ẩn mật khẩu">👁</button>
+      </div>
+    `;
+  }
+
+  function bindPwdEyes(root) {
+    (root || document).querySelectorAll(".pwd-eye").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const inp = document.getElementById(btn.getAttribute("data-target"));
+        if (!inp) return;
+        inp.type = inp.type === "password" ? "text" : "password";
+      });
+    });
   }
 
   // --------------------------------------------------------------------------
-  // 1. Cài đặt nhanh (/cgi-bin/home.asp)
+  // 1. Cài đặt nhanh (/cgi-bin/home.asp) — Matches Image 2 Layout
   // --------------------------------------------------------------------------
   window.RouterPages["home"] = {
-    title: "Cài đặt nhanh",
+    title: "Wi-Fi",
     group: "Tổng quan",
     cgi: "/cgi-bin/home.asp",
     render: function () {
@@ -33,25 +69,78 @@
       const wan = st.wanList[0];
       const s24 = st.wifi24.ssids[0];
       const s5 = st.wifi5.ssids[0];
+      const authOptions = ["WPA2-PSK", "WPA2-PSK/WPA3-SAE", "WPA3-SAE", "OPEN"];
 
       return `
-        <div class="vht-notice">
-          Trang <strong>Cài đặt nhanh</strong> gom các thông số thiết yếu nhất (Tài khoản Internet, Gộp băng tần <strong>Chuyển băng tự động / Band Steering</strong>, Tên &amp; Mật khẩu Wi-Fi và Mật khẩu quản trị).
-        </div>
-
         <div class="vht-card">
-          <div class="vht-card-header">Cài đặt chuyển băng tự động (Band Steering)</div>
           <div class="vht-card-body">
+            <!-- Merged Dual-Band Block when Band Steering is ON -->
+            <div id="qs-wifi-merged" style="display:${st.bandSteering ? "block" : "none"};">
+              <div class="sub-heading" style="margin-top:0;">Thiết lập Wi-Fi hai băng tần</div>
+              <table class="form-table">
+                <tr>
+                  <th>Tên mạng (SSID1)</th>
+                  <td><input type="text" class="vht-input" id="qs-merged-ssid" value="${esc(s24.ssid)}" /></td>
+                </tr>
+                <tr>
+                  <th>Kiểu xác thực</th>
+                  <td>
+                    <select class="vht-select" id="qs-merged-auth">
+                      ${authOptions.map((a) => `<option value="${a}" ${s24.auth === a ? "selected" : ""}>${a}</option>`).join("")}
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <th>Mật khẩu</th>
+                  <td>${pwdInputHtml("qs-merged-key", s24.key)}</td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- Split 2.4GHz & 5GHz Blocks when Band Steering is OFF -->
+            <div id="qs-wifi-split" style="display:${st.bandSteering ? "none" : "block"};">
+              <div class="vht-grid-2col">
+                <div>
+                  <div class="sub-heading" style="margin-top:0;">Thiết lập Wi-Fi 2.4GHz</div>
+                  <table class="form-table">
+                    <tr>
+                      <th>Tên mạng (SSID1)</th>
+                      <td><input type="text" class="vht-input" id="qs-24-ssid" value="${esc(s24.ssid)}" /></td>
+                    </tr>
+                    <tr>
+                      <th>Mật khẩu</th>
+                      <td>${pwdInputHtml("qs-24-key", s24.key)}</td>
+                    </tr>
+                  </table>
+                </div>
+                <div>
+                  <div class="sub-heading" style="margin-top:0;">Thiết lập Wi-Fi 5GHz</div>
+                  <table class="form-table">
+                    <tr>
+                      <th>Tên mạng (SSIDAC1)</th>
+                      <td><input type="text" class="vht-input" id="qs-5-ssid" value="${esc(s5.ssid)}" /></td>
+                    </tr>
+                    <tr>
+                      <th>Mật khẩu</th>
+                      <td>${pwdInputHtml("qs-5-key", s5.key)}</td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Band Steering Toggle Switch -->
+            <div class="sub-heading" style="margin-top:18px;">Cài đặt chuyển băng tự động</div>
             <table class="form-table">
               <tr>
-                <th>Chuyển băng tự động:</th>
+                <th>Chuyển băng tự động</th>
                 <td>
-                  <label class="check-item">
+                  <label class="vht-switch">
                     <input type="checkbox" id="qs-band-steering" ${st.bandSteering ? "checked" : ""} />
-                    <strong>Kích hoạt (Gộp chung tên &amp; mật khẩu Wi-Fi 2.4GHz và 5GHz)</strong>
+                    <span class="vht-slider"></span>
                   </label>
-                  <div class="field-hint" style="margin-left:0;margin-top:4px;">
-                    Khi <strong>Bật</strong>: Router phát chung 1 tên Wi-Fi duy nhất và tự điều hướng thiết bị giữa 5GHz (ở gần) và 2.4GHz (ở xa). Khi <strong>Tắt</strong>: Tách riêng 2 tên mạng 2.4GHz và 5GHz độc lập.
+                  <div style="font-style:italic;font-weight:400;color:#4b5563;font-size:12.5px;margin-top:8px;line-height:1.45;">
+                    Khi bật chuyển băng tự động, Wi-Fi cả hai băng tần luôn luôn bật, đồng thời SSID, kiểu xác thực và mật khẩu của Wi-Fi 2.4GHz và 5GHz được đặt giống nhau.
                   </div>
                 </td>
               </tr>
@@ -59,100 +148,73 @@
           </div>
         </div>
 
-        <div class="vht-card" id="qs-wifi-merged" style="display:${st.bandSteering ? "block" : "none"};">
-          <div class="vht-card-header">Cài đặt Wi-Fi Chung (2.4GHz &amp; 5GHz Smart Connect)</div>
-          <div class="vht-card-body">
-            <table class="form-table">
-              <tr>
-                <th>Tên mạng Wi-Fi (SSID):</th>
-                <td><input type="text" class="vht-input" id="qs-merged-ssid" value="${esc(s24.ssid)}" /></td>
-              </tr>
-              <tr>
-                <th>Kiểu bảo mật:</th>
-                <td>
-                  <select class="vht-select" id="qs-merged-auth">
-                    <option value="WPA2-PSK" ${s24.auth === "WPA2-PSK" ? "selected" : ""}>WPA2-PSK</option>
-                    <option value="WPA2-PSK/WPA3-SAE" ${s24.auth === "WPA2-PSK/WPA3-SAE" ? "selected" : ""}>WPA2-PSK/WPA3-SAE</option>
-                    <option value="WPA3-SAE" ${s24.auth === "WPA3-SAE" ? "selected" : ""}>WPA3-SAE</option>
-                  </select>
-                </td>
-              </tr>
-              <tr>
-                <th>Mật khẩu Wi-Fi:</th>
-                <td>
-                  <input type="text" class="vht-input" id="qs-merged-key" value="${esc(s24.key)}" />
-                  <span class="field-hint">(8 – 63 ký tự)</span>
-                </td>
-              </tr>
-            </table>
-          </div>
-        </div>
-
-        <div id="qs-wifi-split" style="display:${st.bandSteering ? "none" : "block"};">
-          <div class="vht-card">
-            <div class="vht-card-header">Cài đặt nhanh Wi-Fi 2.4GHz (SSID1)</div>
-            <div class="vht-card-body">
-              <table class="form-table">
-                <tr>
-                  <th>Tên Wi-Fi 2.4GHz (SSID1):</th>
-                  <td><input type="text" class="vht-input" id="qs-24-ssid" value="${esc(s24.ssid)}" /></td>
-                </tr>
-                <tr>
-                  <th>Mật khẩu Wi-Fi 2.4GHz:</th>
-                  <td><input type="text" class="vht-input" id="qs-24-key" value="${esc(s24.key)}" /></td>
-                </tr>
-              </table>
+        <!-- Bottom 2-Column Grid: WAN PPPoE & Thay đổi mật khẩu -->
+        <div class="vht-grid-2col">
+          <div>
+            <div class="sec-heading">WAN PPPoE</div>
+            <div class="vht-card">
+              <div class="vht-card-body">
+                <table class="form-table">
+                  <tr>
+                    <th>Tài khoản PPPoE</th>
+                    <td><input type="text" class="vht-input" id="qs-pppoe-user" value="${esc(wan.pppoeUser)}" /></td>
+                  </tr>
+                  <tr>
+                    <th>Mật khẩu PPPoE</th>
+                    <td>${pwdInputHtml("qs-pppoe-pass", wan.pppoePass)}</td>
+                  </tr>
+                  <tr>
+                    <th>VLAN</th>
+                    <td>${wan.vlanId}</td>
+                  </tr>
+                  <tr>
+                    <th style="vertical-align:top;">IP hiện tại</th>
+                    <td>
+                      <div>${esc(wan.wanIp)}</div>
+                      <div style="max-width:240px;overflow-x:auto;white-space:nowrap;font-size:12px;padding-bottom:4px;margin-top:2px;">
+                        ${esc(wan.wanIpv6)}
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </div>
             </div>
           </div>
 
-          <div class="vht-card">
-            <div class="vht-card-header">Cài đặt nhanh Wi-Fi 5GHz (SSIDAC1)</div>
-            <div class="vht-card-body">
-              <table class="form-table">
-                <tr>
-                  <th>Tên Wi-Fi 5GHz (SSIDAC1):</th>
-                  <td><input type="text" class="vht-input" id="qs-5-ssid" value="${esc(s5.ssid)}" /></td>
-                </tr>
-                <tr>
-                  <th>Mật khẩu Wi-Fi 5GHz:</th>
-                  <td><input type="text" class="vht-input" id="qs-5-key" value="${esc(s5.key)}" /></td>
-                </tr>
-              </table>
+          <div>
+            <div class="sec-heading">Thay đổi mật khẩu</div>
+            <div class="vht-card">
+              <div class="vht-card-body">
+                <table class="form-table">
+                  <tr>
+                    <th>Tên người dùng</th>
+                    <td><strong>admin</strong></td>
+                  </tr>
+                  <tr>
+                    <th>Mật khẩu hiện tại</th>
+                    <td>${pwdInputHtml("qs-admin-oldpass", "")}</td>
+                  </tr>
+                  <tr>
+                    <th>Mật khẩu mới</th>
+                    <td>${pwdInputHtml("qs-admin-newpass", "")}</td>
+                  </tr>
+                  <tr>
+                    <th>Xác nhận mật khẩu</th>
+                    <td>${pwdInputHtml("qs-admin-cfpass", "")}</td>
+                  </tr>
+                </table>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="vht-card">
-          <div class="vht-card-header">Tài khoản đường truyền Internet (WAN PPPoE) &amp; Quản trị nhanh</div>
-          <div class="vht-card-body">
-            <table class="form-table">
-              <tr>
-                <th>Tài khoản PPPoE (ISP):</th>
-                <td>
-                  <input type="text" class="vht-input" id="qs-pppoe-user" value="${esc(wan.pppoeUser)}" />
-                  <span class="field-hint">Đồng bộ OMCI (VLAN ${wan.vlanId})</span>
-                </td>
-              </tr>
-              <tr>
-                <th>Mật khẩu PPPoE:</th>
-                <td><input type="password" class="vht-input" id="qs-pppoe-pass" value="${esc(wan.pppoePass)}" /></td>
-              </tr>
-              <tr>
-                <th>Đổi mật khẩu quản trị (admin):</th>
-                <td>
-                  <input type="password" class="vht-input" id="qs-admin-newpass" placeholder="Để trống nếu không đổi" />
-                  <span class="field-hint">Tối thiểu 8 ký tự (Hoa, thường, số, ký tự đặc biệt)</span>
-                </td>
-              </tr>
-            </table>
-            <div class="btn-row">
-              <button class="btn-vht" id="qs-btn-apply">ÁP DỤNG</button>
-            </div>
-          </div>
+        <div class="btn-row center">
+          <button class="btn-vht pill-lg" id="qs-btn-apply">ÁP DỤNG</button>
         </div>
       `;
     },
     bind: function () {
+      bindPwdEyes();
       const chk = document.getElementById("qs-band-steering");
       const mergedBox = document.getElementById("qs-wifi-merged");
       const splitBox = document.getElementById("qs-wifi-split");
@@ -171,8 +233,8 @@
           const ssid = document.getElementById("qs-merged-ssid").value.trim();
           const key = document.getElementById("qs-merged-key").value;
           const auth = document.getElementById("qs-merged-auth").value;
-          if (!ssid) return alert("Tên mạng Wi-Fi (SSID) không được để trống!");
-          if (key.length < 8) return alert("Mật khẩu Wi-Fi phải từ 8 đến 63 ký tự!");
+          if (!ssid) return alert("Tên mạng (SSID1) không được để trống!");
+          if (auth !== "OPEN" && key.length < 8) return alert("Mật khẩu Wi-Fi phải từ 8 đến 63 ký tự!");
           st.wifi24.ssids[0].ssid = ssid;
           st.wifi24.ssids[0].key = key;
           st.wifi24.ssids[0].auth = auth;
@@ -186,7 +248,6 @@
           const k5 = document.getElementById("qs-5-key").value;
           if (!s24 || !s5) return alert("Tên Wi-Fi không được để trống!");
           if (k24.length < 8 || k5.length < 8) return alert("Mật khẩu Wi-Fi phải có ít nhất 8 ký tự!");
-          // If user just turned OFF band steering and 5GHz still had identical name, suggest/keep user value
           st.wifi24.ssids[0].ssid = s24;
           st.wifi24.ssids[0].key = k24;
           st.wifi5.ssids[0].ssid = s5;
@@ -198,192 +259,179 @@
 
         const newAdminPass = document.getElementById("qs-admin-newpass").value;
         if (newAdminPass) {
+          const cfPass = document.getElementById("qs-admin-cfpass").value;
+          if (newAdminPass !== cfPass) return alert("Xác nhận mật khẩu không trùng khớp!");
           const strong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
           if (!strong.test(newAdminPass)) {
-            return alert("Mật khẩu quản trị mới phải tối thiểu 8 ký tự, bao gồm chữ hoa, chữ thường, chữ số và ký tự đặc biệt!");
+            return alert("Mật khẩu quản trị mới phải tối thiểu 8 ký tự, gồm chữ hoa, thường, số và ký tự đặc biệt!");
           }
           st.admin.password = newAdminPass;
         }
 
         window.SimEngine.reconcileClients();
-        window.SimEngine.addLog(
-          "[QUICK SETUP] Cập nhật Cài đặt nhanh (Chuyển băng tự động: " + (st.bandSteering ? "Bật" : "Tắt") + ")."
-        );
+        window.SimEngine.addLog("[QUICK SETUP] Cập nhật Cài đặt nhanh (Chuyển băng tự động: " + (st.bandSteering ? "Bật" : "Tắt") + ").");
         window.RouterApp.applyWithFeedback("Đã lưu Cài đặt nhanh thành công!", oldSsid !== st.wifi24.ssids[0].ssid);
       });
     }
   };
 
   // --------------------------------------------------------------------------
-  // 2. Thông tin thiết bị (/cgi-bin/deviceinfo.asp)
+  // 2. Thông tin thiết bị (/cgi-bin/deviceinfo.asp) — Matches Image 3 Layout
   // --------------------------------------------------------------------------
   window.RouterPages["deviceinfo"] = {
-    title: "Thông tin thiết bị",
+    title: "Thông tin cơ bản",
     group: "Tổng quan",
     cgi: "/cgi-bin/deviceinfo.asp",
+    selectedWanIdx: 0,
     render: function () {
       const st = window.SimState;
       const dev = st.device;
+      const wIdx = this.selectedWanIdx < st.wanList.length ? this.selectedWanIdx : 0;
+      const wan = st.wanList[wIdx];
       const wan0 = st.wanList[0];
-      const wan1 = st.wanList[1];
-      const rxPower = dev.fiberFault ? "-31.85 dBm (Suy hao vượt ngưỡng -27 dBm!)" : "-21.14 dBm (Tín hiệu tốt: -8 ~ -27 dBm)";
-      const txPower = dev.fiberFault ? "-40.00 dBm (Mất đồng bộ quang)" : "+2.35 dBm (Bình thường)";
-      const ponState = dev.fiberFault ? "O1 / LOS (Mất tín hiệu ánh sáng!)" : "O5 (Đã đồng bộ - Associated)";
+
+      const rxPower = dev.fiberFault ? "-31.8 dBm" : "-21.1 dBm";
+      const txPower = dev.fiberFault ? "0.0 dBm" : "2.6 dBm";
+      const ponState = dev.fiberFault ? "Mất tín hiệu quang (LOS)" : "Kết nối thành công (O5)";
+      const netState = dev.fiberFault ? "Mất kết nối" : "Kết nối thành công";
       const lan1Connected = st.simDevices.laptopObs.connMode === "LAN1";
       const lan2Connected = st.simDevices.desktopVm.connected;
 
       return `
+        <!-- Top Card: Thông tin cơ bản (2 Columns: Thông tin PON & Thông tin kết nối Internet) -->
         <div class="vht-card">
-          <div class="vht-card-header">
-            <span>1. Thông tin chung &amp; Tài nguyên hệ thống</span>
-            <span class="badge-pill gray">Chỉ đọc (Read-only)</span>
-          </div>
           <div class="vht-card-body">
-            <table class="form-table">
-              <tr><th>Tên thiết bị:</th><td><strong>${esc(dev.name)}</strong></td></tr>
-              <tr><th>Mã Model / Nhà sản xuất:</th><td><strong>${esc(dev.model)}</strong> — VHT (Viettel High Tech) | P/N: ${esc(dev.partNumber)} | HW: ${esc(dev.hwVersion)}</td></tr>
-              <tr><th>Phiên bản Firmware:</th><td><strong>${esc(dev.firmware)}</strong></td></tr>
-              <tr><th>GPON Serial Number:</th><td><code>${esc(dev.gponSN)}</code></td></tr>
-              <tr><th>Địa chỉ MAC (LAN / WAN):</th><td><code>${esc(dev.macLan)}</code> / <code>${esc(dev.macWan)}</code></td></tr>
-              <tr><th>Thời gian hoạt động (Uptime):</th><td id="devinfo-uptime">${formatUptime(dev.uptimeSec)}</td></tr>
-              <tr>
-                <th>Tải CPU:</th>
-                <td>
-                  <div class="meter-wrap">
-                    <div class="meter-bar"><div class="meter-fill ${dev.cpuLoad > 85 ? "high" : ""}" style="width:${dev.cpuLoad}%;"></div></div>
-                    <strong>${dev.cpuLoad}%</strong>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <th>Bộ nhớ đã dùng (RAM):</th>
-                <td>
-                  <div class="meter-wrap">
-                    <div class="meter-bar"><div class="meter-fill ${dev.ramUsage > 85 ? "high" : ""}" style="width:${dev.ramUsage}%;"></div></div>
-                    <strong>${dev.ramUsage}%</strong>
-                  </div>
-                </td>
-              </tr>
-            </table>
+            <div class="vht-grid-2col">
+              <div>
+                <div class="sub-heading" style="margin-top:0;">Thông tin PON</div>
+                <table class="form-table">
+                  <tr>
+                    <th>Công suất thu</th>
+                    <td><span class="${dev.fiberFault ? "badge-err" : "badge-ok"}">${rxPower}</span></td>
+                  </tr>
+                  <tr>
+                    <th>Công suất phát</th>
+                    <td><span class="${dev.fiberFault ? "badge-err" : "badge-ok"}">${txPower}</span></td>
+                  </tr>
+                  <tr>
+                    <th>Trạng thái kết nối PON</th>
+                    <td><span class="${dev.fiberFault ? "badge-err" : "badge-ok"}">${ponState}</span></td>
+                  </tr>
+                </table>
+              </div>
+
+              <div>
+                <div class="sub-heading" style="margin-top:0;">Thông tin kết nối Internet</div>
+                <table class="form-table">
+                  <tr>
+                    <th>Địa chỉ IPv4</th>
+                    <td><span class="${dev.fiberFault ? "badge-err" : "badge-ok"}">${dev.fiberFault ? "0.0.0.0" : esc(wan0.wanIp)}</span></td>
+                  </tr>
+                  <tr>
+                    <th>Địa chỉ IPv6</th>
+                    <td>
+                      <div class="${dev.fiberFault ? "badge-err" : "badge-ok"}" style="max-width:230px;overflow-x:auto;white-space:nowrap;padding-bottom:3px;">
+                        ${dev.fiberFault ? "---" : esc(wan0.wanIpv6)}
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>Trạng thái kết nối Internet</th>
+                    <td><span class="${dev.fiberFault ? "badge-err" : "badge-ok"}">${netState}</span></td>
+                  </tr>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="vht-card">
-          <div class="vht-card-header">2. Trạng thái cổng Ethernet (LAN1 – LAN4) &amp; Địa chỉ mạng LAN</div>
-          <div class="vht-card-body">
-            <table class="data-table" style="margin-bottom:12px;">
-              <thead>
-                <tr>
-                  <th>Cổng vật lý</th>
-                  <th>Trạng thái kết nối</th>
-                  <th>Tốc độ thương lượng</th>
-                  <th>Chế độ Duplex</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><strong>LAN 1</strong></td>
-                  <td>${lan1Connected ? '<span class="badge-pill green">Đã kết nối (Up)</span>' : '<span class="badge-pill gray">Không kết nối (Down)</span>'}</td>
-                  <td>${lan1Connected ? "1000 Mbps (1 Gbps)" : "---"}</td>
-                  <td>${lan1Connected ? "Full Duplex" : "---"}</td>
-                </tr>
-                <tr>
-                  <td><strong>LAN 2</strong></td>
-                  <td>${lan2Connected ? '<span class="badge-pill green">Đã kết nối (Up - VMware Bridged)</span>' : '<span class="badge-pill gray">Không kết nối (Down)</span>'}</td>
-                  <td>${lan2Connected ? "1000 Mbps (1 Gbps)" : "---"}</td>
-                  <td>${lan2Connected ? "Full Duplex" : "---"}</td>
-                </tr>
-                <tr>
-                  <td><strong>LAN 3</strong></td>
-                  <td><span class="badge-pill gray">Không kết nối (Down)</span></td>
-                  <td>---</td>
-                  <td>---</td>
-                </tr>
-                <tr>
-                  <td><strong>LAN 4</strong></td>
-                  <td><span class="badge-pill gray">Không kết nối (Down)</span></td>
-                  <td>---</td>
-                  <td>---</td>
-                </tr>
-              </tbody>
-            </table>
-            <table class="form-table">
-              <tr><th>Địa chỉ LAN IPv4 / Subnet Mask:</th><td><code>${esc(st.lan.ip)}</code> / <code>${esc(st.lan.mask)}</code> (DHCP Server: <strong>${st.lan.dhcpEnabled ? "Bật" : "Tắt"}</strong>)</td></tr>
-              <tr><th>Địa chỉ LAN IPv6 (Link-Local):</th><td><code>fe80::260b:2bff:fe39:d5bc/64</code></td></tr>
-              <tr><th>Địa chỉ LAN IPv6 (Global):</th><td><code>2402:800:63a1:1200::1/64</code></td></tr>
-            </table>
-          </div>
-        </div>
+        <!-- Bottom 2-Column Grid: Thông tin thiết bị (Left) & WAN (Right) -->
+        <div class="vht-grid-2col">
+          <div>
+            <div class="sec-heading">Thông tin thiết bị</div>
+            <div class="vht-card">
+              <div class="vht-card-body">
+                <div class="sub-heading" style="margin-top:0;">Thông tin chung</div>
+                <table class="form-table">
+                  <tr><th>Tên thiết bị</th><td>${esc(dev.name)}</td></tr>
+                  <tr><th>Tên mẫu</th><td>${esc(dev.model)}</td></tr>
+                  <tr><th>Phiên bản Firmware</th><td>${esc(dev.firmware)}</td></tr>
+                  <tr><th>Số serial GPON</th><td>${esc(dev.gponSN)}</td></tr>
+                  <tr><th>Địa chỉ MAC</th><td>${esc(dev.macLan)}</td></tr>
+                </table>
 
-        <div class="vht-card">
-          <div class="vht-card-header">3. Thông tin PON / GPON &amp; Module quang Transceiver</div>
-          <div class="vht-card-body">
-            <table class="form-table">
-              <tr><th>Trạng thái đăng ký PON:</th><td><span class="${dev.fiberFault ? "badge-err" : "badge-ok"}">${ponState}</span></td></tr>
-              <tr><th>Loại tổng đài phía nhà mạng (OLT):</th><td><strong>OLT ZTE (ZTEG)</strong></td></tr>
-              <tr><th>Chuẩn Module quang:</th><td><strong>GPON Class B+ (SC/APC)</strong></td></tr>
-              <tr>
-                <th>Công suất thu quang (Rx Power):</th>
-                <td><span class="${dev.fiberFault ? "badge-err" : "badge-ok"}">${rxPower}</span></td>
-              </tr>
-              <tr>
-                <th>Công suất phát quang (Tx Power):</th>
-                <td><span class="${dev.fiberFault ? "badge-err" : "badge-ok"}">${txPower}</span></td>
-              </tr>
-              <tr><th>Nhiệt độ chip quang (Transceiver Temp):</th><td>54.8 °C</td></tr>
-              <tr><th>Điện áp cung cấp nội / Dòng phân cực Laser:</th><td>3290 mV (3.29 V) &nbsp;|&nbsp; 11.4 mA <span class="field-hint">(Thông số linh kiện laser phục vụ kỹ thuật viên ISP)</span></td></tr>
-            </table>
-          </div>
-        </div>
+                <div class="sub-heading">Thông tin thời gian</div>
+                <table class="form-table">
+                  <tr><th>Giờ hệ thống</th><td id="devinfo-sysclock">${formatVnClock(window.SimEngine.nowRouterDate())}</td></tr>
+                  <tr><th>Thời gian hoạt động của hệ thống</th><td id="devinfo-uptime">${formatHms(dev.uptimeSec)}</td></tr>
+                </table>
 
-        <div class="vht-card">
-          <div class="vht-card-header">4. Trạng thái WAN IPv4/IPv6 &amp; Quản lý từ xa TR-069 / TMS</div>
-          <div class="vht-card-body">
-            <table class="data-table" style="margin-bottom:12px;">
-              <thead>
-                <tr>
-                  <th>Tên giao diện WAN</th>
-                  <th>Chế độ / Giao thức</th>
-                  <th>VLAN ID</th>
-                  <th>Trạng thái</th>
-                  <th>Địa chỉ IPv4 / DNS</th>
-                  <th>Địa chỉ IPv6</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><strong>${esc(wan0.id)}</strong></td>
-                  <td>${esc(wan0.mode)} / ${esc(wan0.connType)}</td>
-                  <td>${wan0.vlanId}</td>
-                  <td>${dev.fiberFault ? '<span class="badge-pill red">Mất kết nối</span>' : '<span class="badge-pill green">' + esc(wan0.status) + "</span>"}</td>
-                  <td>${dev.fiberFault ? "0.0.0.0" : esc(wan0.wanIp)} <br/><small>DNS: ${esc(wan0.dns1)}, ${esc(wan0.dns2)}</small></td>
-                  <td><small>${dev.fiberFault ? "---" : esc(wan0.wanIpv6)}</small></td>
-                </tr>
-                ${
-                  wan1
-                    ? `<tr>
-                  <td><strong>${esc(wan1.id)}</strong></td>
-                  <td>${esc(wan1.mode)} / ${esc(wan1.connType)}</td>
-                  <td>${wan1.vlanId}</td>
-                  <td>${dev.fiberFault ? '<span class="badge-pill red">Mất kết nối</span>' : '<span class="badge-pill green">Đã kết nối</span>'}</td>
-                  <td>${dev.fiberFault ? "0.0.0.0" : esc(wan1.wanIp)}</td>
-                  <td>N/A</td>
-                </tr>`
-                    : ""
-                }
-              </tbody>
-            </table>
-            <table class="form-table">
-              <tr>
-                <th>Trạng thái TR-069 / TMS:</th>
-                <td><span class="badge-ok">Đã đồng bộ ACS Viettel TMS</span> — Cho phép tổng đài hỗ trợ chẩn đoán &amp; cấu hình từ xa qua VLAN 2501.</td>
-              </tr>
-            </table>
+                <div class="sub-heading">Thông tin tài nguyên</div>
+                <table class="form-table">
+                  <tr><th>Tải CPU</th><td>${dev.cpuLoad}%</td></tr>
+                  <tr><th>Bộ nhớ đã dùng</th><td>${dev.ramUsage}%</td></tr>
+                </table>
+
+                <div class="sub-heading">Thông tin Module quang &amp; Cổng LAN</div>
+                <table class="form-table">
+                  <tr><th>Loại OLT / Module quang</th><td>OLT ZTE (Class B+ | Nhiệt độ 54.8 °C)</td></tr>
+                  <tr><th>Cổng LAN1 – LAN4</th><td>LAN1: ${lan1Connected ? "1000M Up" : "Down"} | LAN2: ${lan2Connected ? "1000M Up" : "Down"} | LAN3–4: Down</td></tr>
+                  <tr><th>Địa chỉ IPv4 LAN</th><td>${esc(st.lan.ip)} / ${esc(st.lan.mask)}</td></tr>
+                  <tr><th>Trạng thái TR-069 / TMS</th><td>Đã kết nối ACS Viettel</td></tr>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="sec-heading">WAN</div>
+            <div class="vht-card">
+              <div class="vht-card-body">
+                <div style="margin-bottom:12px;">
+                  <select class="vht-select" id="devinfo-wan-sel" style="width:100%;">
+                    ${st.wanList
+                      .map((w, i) => `<option value="${i}" ${i === wIdx ? "selected" : ""}>${esc(w.id)}</option>`)
+                      .join("")}
+                  </select>
+                </div>
+
+                <table class="form-table">
+                  <tr><th>Loại kết nối</th><td>${esc(wan.connType)}</td></tr>
+                  <tr><th>Địa chỉ MAC</th><td>${esc(dev.macWan)}</td></tr>
+                  <tr><th>Thời gian chạy PPPoE</th><td>${formatHms(Math.max(60, dev.uptimeSec - 180))}</td></tr>
+                </table>
+
+                <div class="sub-heading">IPv4</div>
+                <table class="form-table">
+                  <tr><th>Trạng thái</th><td>${dev.fiberFault ? "Ngắt kết nối" : "Kết nối"}</td></tr>
+                  <tr><th>Địa chỉ IP</th><td>${dev.fiberFault ? "0.0.0.0" : esc(wan.wanIp)}</td></tr>
+                  <tr><th>Mặt nạ mạng con</th><td>255.255.255.255</td></tr>
+                  <tr><th>Gateway mặc định</th><td>${esc(wan.wanGateway)}</td></tr>
+                  <tr><th>DNS chính</th><td>${esc(wan.dns1)}</td></tr>
+                  <tr><th>DNS phụ</th><td>${esc(wan.dns2 || "---")}</td></tr>
+                </table>
+
+                <div class="sub-heading">IPv6</div>
+                <table class="form-table">
+                  <tr><th>Trạng thái</th><td>${wan.ipVersion.includes("IPv6") && !dev.fiberFault ? "Kết nối" : "N/A"}</td></tr>
+                  <tr><th>Địa chỉ IPv6</th><td><small>${esc(wan.wanIpv6)}</small></td></tr>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       `;
     },
-    bind: function () {}
+    bind: function () {
+      const self = this;
+      const sel = document.getElementById("devinfo-wan-sel");
+      if (sel) {
+        sel.addEventListener("change", function (e) {
+          self.selectedWanIdx = parseInt(e.target.value, 10) || 0;
+          window.RouterApp.renderCurrentPage();
+        });
+      }
+    }
   };
 
   // --------------------------------------------------------------------------
@@ -401,7 +449,7 @@
       const lanClients = [];
       if (st.simDevices.laptopObs.connMode === "LAN1") {
         lanClients.push({
-          name: st.simDevices.laptopObs.name + " (Máy đang cấu hình)",
+          name: st.simDevices.laptopObs.name,
           port: "LAN1",
           mac: st.simDevices.laptopObs.mac,
           ip: st.simDevices.laptopObs.ip,
@@ -410,8 +458,8 @@
       }
       if (st.simDevices.desktopVm.connected) {
         lanClients.push({
-          name: st.simDevices.desktopVm.name + " (VMware Bridged)",
-          port: "LAN2 (Bridged)",
+          name: st.simDevices.desktopVm.name,
+          port: "LAN2",
           mac: st.simDevices.desktopVm.mac,
           ip: window.SimEngine.allocateDhcpIpForMac(st.simDevices.desktopVm.mac, st.simDevices.desktopVm.ip),
           speed: "1000 Mbps"
@@ -458,31 +506,22 @@
       }
 
       return `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <div class="field-hint" style="margin:0;">
-            Hiển thị danh sách thời gian thực các thiết bị trong mạng <strong>Infrastructure</strong> (cổng dây LAN, sóng Wi-Fi 2.4GHz và Wi-Fi 5GHz).
-          </div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
           <button class="btn-vht small" id="sta-btn-reload">TẢI LẠI</button>
         </div>
 
-        ${
-          schedOff
-            ? `<div class="vht-notice warn"><strong>Lập lịch Wi-Fi đang kích hoạt (${esc(schedOff.name)}: ${schedOff.start} – ${schedOff.end}):</strong> Toàn bộ sóng Wi-Fi 2.4GHz &amp; 5GHz hiện đang tạm ngắt theo lịch hẹn!</div>`
-            : ""
-        }
-
         <div class="vht-card">
-          <div class="vht-card-header">1. Thiết bị kết nối qua cổng dây Ethernet (LAN1 – LAN4)</div>
+          <div class="vht-card-header">Thiết bị kết nối cổng LAN (Ethernet)</div>
           <div class="vht-card-body">
             <table class="data-table">
               <thead>
                 <tr>
                   <th>STT</th>
-                  <th>Tên thiết bị (Hostname)</th>
+                  <th>Tên thiết bị</th>
                   <th>Cổng</th>
                   <th>Địa chỉ MAC</th>
                   <th>Địa chỉ IP</th>
-                  <th>Tốc độ liên kết</th>
+                  <th>Tốc độ (Mbps)</th>
                 </tr>
               </thead>
               <tbody>
@@ -496,9 +535,9 @@
                     <td>${idx + 1}</td>
                     <td><strong>${esc(c.name)}</strong></td>
                     <td>${esc(c.port)}</td>
-                    <td><code>${esc(c.mac)}</code> <button class="btn-icon copy-mac-btn" data-mac="${esc(c.mac)}" title="Copy MAC">📋 Copy</button></td>
+                    <td><code>${esc(c.mac)}</code></td>
                     <td><strong>${esc(c.ip)}</strong></td>
-                    <td><span class="badge-pill green">${esc(c.speed)}</span></td>
+                    <td>${esc(c.speed)}</td>
                   </tr>`
                         )
                         .join("")
@@ -509,7 +548,7 @@
         </div>
 
         <div class="vht-card">
-          <div class="vht-card-header">2. Thiết bị đang kết nối Wi-Fi 2.4GHz (${esc(st.wifi24.mode)} | ${esc(st.wifi24.bandwidth)})</div>
+          <div class="vht-card-header">Thiết bị đang kết nối Wi-Fi 2.4GHz</div>
           <div class="vht-card-body">
             <table class="data-table">
               <thead>
@@ -519,7 +558,7 @@
                   <th>SSID</th>
                   <th>Địa chỉ MAC</th>
                   <th>Địa chỉ IP</th>
-                  <th>Cường độ sóng RSSI (dBm)</th>
+                  <th>RSSI (dBm)</th>
                   <th>Tốc độ (Mbps)</th>
                 </tr>
               </thead>
@@ -534,10 +573,10 @@
                     <td>${idx + 1}</td>
                     <td><strong>${esc(c.name)}</strong></td>
                     <td>${esc(c.ssid)}</td>
-                    <td><code>${esc(c.mac)}</code> <button class="btn-icon copy-mac-btn" data-mac="${esc(c.mac)}">📋 Copy</button></td>
+                    <td><code>${esc(c.mac)}</code></td>
                     <td><strong>${esc(c.ip)}</strong></td>
                     <td>${esc(c.rssi)}</td>
-                    <td><span class="badge-pill gray">${esc(c.speed)}</span></td>
+                    <td>${esc(c.speed)}</td>
                   </tr>`
                         )
                         .join("")
@@ -548,7 +587,7 @@
         </div>
 
         <div class="vht-card">
-          <div class="vht-card-header">3. Thiết bị đang kết nối Wi-Fi 5GHz (${esc(st.wifi5.mode)} | ${esc(st.wifi5.bandwidth)})</div>
+          <div class="vht-card-header">Thiết bị đang kết nối Wi-Fi 5GHz</div>
           <div class="vht-card-body">
             <table class="data-table">
               <thead>
@@ -558,7 +597,7 @@
                   <th>SSID</th>
                   <th>Địa chỉ MAC</th>
                   <th>Địa chỉ IP</th>
-                  <th>Cường độ sóng RSSI (dBm)</th>
+                  <th>RSSI (dBm)</th>
                   <th>Tốc độ (Mbps)</th>
                 </tr>
               </thead>
@@ -573,10 +612,10 @@
                     <td>${idx + 1}</td>
                     <td><strong>${esc(c.name)}</strong></td>
                     <td>${esc(c.ssid)}</td>
-                    <td><code>${esc(c.mac)}</code> <button class="btn-icon copy-mac-btn" data-mac="${esc(c.mac)}">📋 Copy</button></td>
+                    <td><code>${esc(c.mac)}</code></td>
                     <td><strong>${esc(c.ip)}</strong></td>
                     <td><span class="badge-ok">${esc(c.rssi)}</span></td>
-                    <td><span class="badge-pill green">${esc(c.speed)}</span></td>
+                    <td><span class="badge-ok">${esc(c.speed)}</span></td>
                   </tr>`
                         )
                         .join("")
@@ -589,7 +628,6 @@
     },
     bind: function () {
       document.getElementById("sta-btn-reload").addEventListener("click", function () {
-        // Refresh DHCP lease calculation on reload
         const p = window.SimState.simDevices.phone;
         if (p.connected) {
           p.ip = window.SimEngine.allocateDhcpIpForMac(p.mac, p.ip);
@@ -599,14 +637,6 @@
         window.RouterApp.renderCurrentPage();
         window.LabUI.render();
       });
-
-      document.querySelectorAll(".copy-mac-btn").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          const mac = btn.getAttribute("data-mac");
-          if (navigator.clipboard) navigator.clipboard.writeText(mac);
-          window.RouterApp.showToast("Đã copy địa chỉ MAC: " + mac);
-        });
-      });
     }
   };
 
@@ -614,17 +644,17 @@
   // 4. Topology hiện tại (/cgi-bin/wifi-mesh-topology.asp)
   // --------------------------------------------------------------------------
   window.RouterPages["wifi-mesh-topology"] = {
-    title: "Topology hiện tại (Runtime EasyMesh Topology)",
+    title: "Topology hiện tại",
     group: "Tổng quan",
     cgi: "/cgi-bin/wifi-mesh-topology.asp",
     render: function () {
       const st = window.SimState;
       const clients = [];
       if (st.simDevices.laptopObs.connMode === "LAN1") {
-        clients.push({ name: st.simDevices.laptopObs.name, link: "Cáp LAN1 (1000 Mbps)", ip: st.simDevices.laptopObs.ip });
+        clients.push({ name: st.simDevices.laptopObs.name, link: "LAN1 (1000 Mbps)", ip: st.simDevices.laptopObs.ip });
       }
       if (st.simDevices.desktopVm.connected) {
-        clients.push({ name: st.simDevices.desktopVm.name, link: "LAN Bridged (1000 Mbps)", ip: st.simDevices.desktopVm.ip });
+        clients.push({ name: st.simDevices.desktopVm.name, link: "LAN2 (1000 Mbps)", ip: st.simDevices.desktopVm.ip });
       }
       if (st.simDevices.phone.wifiOn && st.simDevices.phone.connected && !window.SimEngine.isWifiScheduledOff()) {
         clients.push({
@@ -644,34 +674,31 @@
       return `
         <div class="vht-card">
           <div class="vht-card-header">
-            <span>Sơ đồ cây mạng trực quan (EasyMesh Runtime Topology)</span>
+            <span>Runtime Topology</span>
             <div>
               <button class="btn-vht outline small" id="topo-toggle-agent">
-                ${st.mesh.demoAgentConnected ? "Ẩn Node Mesh Vệ Tinh mẫu" : "+ Giả lập thêm 1 Node Mesh Agent (Tầng 2)"}
+                ${st.mesh.demoAgentConnected ? "Ẩn Mesh Agent" : "+ Thêm Mesh Agent"}
               </button>
-              <button class="btn-vht small" id="topo-refresh">LÀM MỚI SƠ ĐỒ</button>
+              <button class="btn-vht small" id="topo-refresh">LÀM MỚI</button>
             </div>
           </div>
           <div class="vht-card-body">
             <div class="topo-canvas">
               <div class="topo-node">
                 <div style="font-size:11px;color:#ee0033;font-weight:800;">EASYMESH ${esc(st.mesh.role.toUpperCase())}</div>
-                <div style="font-size:15px;font-weight:800;margin:3px 0;">Viettel ${esc(st.device.model)}</div>
+                <div style="font-size:15px;font-weight:800;margin:3px 0;">${esc(st.device.model)}</div>
                 <div style="font-size:12px;color:#475569;">IP: ${esc(st.lan.ip)} | MAC: ${esc(st.device.macLan)}</div>
-                <div style="font-size:11.5px;color:#16a34a;margin-top:3px;font-weight:700;">PON O5 (-21.14 dBm) • WAN VLAN 35</div>
               </div>
-
-              <div style="color:#64748b;font-size:12px;font-weight:700;">▼ Các thiết bị kết nối trực tiếp (${clients.length} thiết bị) ▼</div>
 
               <div class="topo-children">
                 ${
                   clients.length === 0
-                    ? `<div class="field-hint">Chưa có thiết bị khách nào đang kết nối.</div>`
+                    ? `<div class="field-hint">Chưa có thiết bị kết nối.</div>`
                     : clients
                         .map(
                           (c) => `
                   <div class="topo-client">
-                    <div style="font-weight:700;color:#0f172a;">💻 ${esc(c.name)}</div>
+                    <div style="font-weight:700;color:#0f172a;">${esc(c.name)}</div>
                     <div style="color:#16a34a;font-weight:600;margin-top:2px;">${esc(c.link)}</div>
                     <div style="color:#64748b;margin-top:2px;">IP: ${esc(c.ip)}</div>
                   </div>`
@@ -683,14 +710,11 @@
               ${
                 st.mesh.demoAgentConnected
                   ? `
-                <div style="color:#2563eb;font-size:12px;font-weight:700;">▼ Liên kết Backhaul 5GHz (802.11ax -61 dBm | Chung SSID Roaming) ▼</div>
                 <div class="topo-node agent">
-                  <div style="font-size:11px;color:#2563eb;font-weight:800;">EASYMESH AGENT (VỆ TINH TẦNG 2)</div>
-                  <div style="font-size:14px;font-weight:800;margin:3px 0;">Home Wi-Fi Viettel H196A</div>
-                  <div style="font-size:12px;color:#475569;">IP: 192.168.1.250 | MAC: 24:0B:2B:88:41:10</div>
-                  <div style="font-size:11.5px;color:#2563eb;margin-top:3px;">1 thiết bị đang bám: SmartTV-Tang2 (5GHz -49 dBm)</div>
-                </div>
-              `
+                  <div style="font-size:11px;color:#2563eb;font-weight:800;">EASYMESH AGENT</div>
+                  <div style="font-size:14px;font-weight:800;margin:3px 0;">Home Wi-Fi H196A</div>
+                  <div style="font-size:12px;color:#475569;">Backhaul 5GHz (-61 dBm) | IP: 192.168.1.250</div>
+                </div>`
                   : ""
               }
             </div>
@@ -705,7 +729,6 @@
         window.RouterApp.renderCurrentPage();
       });
       document.getElementById("topo-refresh").addEventListener("click", function () {
-        window.RouterApp.showToast("Đã cập nhật sơ đồ cây EasyMesh Topology!");
         window.RouterApp.renderCurrentPage();
       });
     }
@@ -726,16 +749,14 @@
       const allPorts = ["LAN1", "LAN2", "LAN3", "LAN4", "SSID1", "SSID2", "SSID3", "SSID4", "SSIDAC1", "SSIDAC2", "SSIDAC3"];
 
       return `
-        <div class="vht-notice">
-          <strong>Thông báo OMCI từ tổng đài quang (OLT ZTE):</strong> Giao diện <code>1_INTERNET_R_VID_35</code> và <code>7_TR069_R_VID_2501</code> được nhà mạng Viettel tự động đẩy cấu hình xuống qua giao thức quản lý cáp quang <strong>OMCI</strong> ngay cả sau khi Reset cứng!
-        </div>
-
         <div class="vht-card">
-          <div class="vht-card-header">Cấu hình kết nối WAN</div>
+          <div class="vht-card-header">
+            <span>Giao diện WAN được cấu hình tự động qua OMCI</span>
+          </div>
           <div class="vht-card-body">
             <table class="form-table">
               <tr>
-                <th>Tên kết nối WAN:</th>
+                <th>Tên kết nối</th>
                 <td>
                   <select class="vht-select" id="wan-select-conn">
                     ${st.wanList
@@ -745,75 +766,72 @@
                 </td>
               </tr>
               <tr>
-                <th>Chế độ (Mode):</th>
+                <th>Chế độ</th>
                 <td>
                   <select class="vht-select" id="wan-mode">
-                    <option value="Route" ${w.mode === "Route" ? "selected" : ""}>Route (Định tuyến &amp; Cấp phát NAT)</option>
-                    <option value="Bridge" ${w.mode === "Bridge" ? "selected" : ""}>Bridge (Cầu nối quang sang Router ngoài)</option>
+                    <option value="Route" ${w.mode === "Route" ? "selected" : ""}>Route</option>
+                    <option value="Bridge" ${w.mode === "Bridge" ? "selected" : ""}>Bridge</option>
                   </select>
                 </td>
               </tr>
               <tr>
-                <th>Phiên bản IP:</th>
+                <th>Phiên bản IP</th>
                 <td>
                   <select class="vht-select" id="wan-ipver">
                     <option value="IPv4" ${w.ipVersion === "IPv4" ? "selected" : ""}>IPv4</option>
                     <option value="IPv6" ${w.ipVersion === "IPv6" ? "selected" : ""}>IPv6</option>
-                    <option value="IPv4/IPv6" ${w.ipVersion === "IPv4/IPv6" ? "selected" : ""}>IPv4/IPv6 (Dual-Stack)</option>
+                    <option value="IPv4/IPv6" ${w.ipVersion === "IPv4/IPv6" ? "selected" : ""}>IPv4/IPv6</option>
                   </select>
                 </td>
               </tr>
               <tr id="wan-row-conntype" style="display:${w.mode === "Bridge" ? "none" : ""};">
-                <th>Chế độ kết nối:</th>
+                <th>Chế độ kết nối</th>
                 <td>
                   <select class="vht-select" id="wan-conntype">
-                    <option value="PPPoE" ${w.connType === "PPPoE" ? "selected" : ""}>PPPoE (Xác thực tài khoản ISP)</option>
-                    <option value="DHCP" ${w.connType === "DHCP" ? "selected" : ""}>DHCP (Nhận IP WAN tự động)</option>
-                    <option value="Static" ${w.connType === "Static" ? "selected" : ""}>Static (Gán IP WAN tĩnh)</option>
-                    <option value="PPPoA" ${w.connType === "PPPoA" ? "selected" : ""}>PPPoA (Cáp đồng ADSL cũ)</option>
-                    <option value="IPoA" ${w.connType === "IPoA" ? "selected" : ""}>IPoA (Cáp đồng ADSL cũ)</option>
+                    <option value="PPPoE" ${w.connType === "PPPoE" ? "selected" : ""}>PPPoE</option>
+                    <option value="DHCP" ${w.connType === "DHCP" ? "selected" : ""}>DHCP</option>
+                    <option value="Static" ${w.connType === "Static" ? "selected" : ""}>Static</option>
+                    <option value="PPPoA" ${w.connType === "PPPoA" ? "selected" : ""}>PPPoA</option>
+                    <option value="IPoA" ${w.connType === "IPoA" ? "selected" : ""}>IPoA</option>
                   </select>
                 </td>
               </tr>
               <tr class="wan-pppoe-only" style="display:${w.mode === "Route" && w.connType === "PPPoE" ? "" : "none"};">
-                <th>Tài khoản PPPoE:</th>
+                <th>Tài khoản PPPoE</th>
                 <td><input type="text" class="vht-input" id="wan-user" value="${esc(w.pppoeUser)}" /></td>
               </tr>
               <tr class="wan-pppoe-only" style="display:${w.mode === "Route" && w.connType === "PPPoE" ? "" : "none"};">
-                <th>Mật khẩu PPPoE:</th>
+                <th>Mật khẩu PPPoE</th>
                 <td><input type="password" class="vht-input" id="wan-pass" value="${esc(w.pppoePass)}" /></td>
               </tr>
               <tr>
-                <th>Kích thước gói tối đa (MTU):</th>
-                <td>
-                  <input type="number" class="vht-input short" id="wan-mtu" value="${w.mtu}" />
-                  <span class="field-hint">bytes (Chuẩn PPPoE = <strong>1492</strong> do trừ 8 byte PPPoE header; Ethernet DHCP/Static = 1500)</span>
-                </td>
+                <th>MTU</th>
+                <td><input type="number" class="vht-input short" id="wan-mtu" value="${w.mtu}" /></td>
               </tr>
               <tr>
-                <th>Cơ chế NAT &amp; IGMP Proxy:</th>
+                <th>Tùy chọn NAT / IGMP</th>
                 <td>
                   <div class="check-grid">
-                    <label class="check-item"><input type="checkbox" id="wan-nat" ${w.nat ? "checked" : ""} /> Kích hoạt NAT</label>
-                    <label class="check-item"><input type="checkbox" id="wan-igmp" ${w.igmpProxy ? "checked" : ""} /> Kích hoạt IGMP Proxy (IPTV)</label>
+                    <label class="check-item"><input type="checkbox" id="wan-nat" ${w.nat ? "checked" : ""} /> NAT</label>
+                    <label class="check-item"><input type="checkbox" id="wan-igmp" ${w.igmpProxy ? "checked" : ""} /> IGMP Proxy</label>
                   </div>
                 </td>
               </tr>
               <tr>
-                <th>Tùy chọn VLAN:</th>
+                <th>Tùy chọn VLAN</th>
                 <td>
-                  <select class="vht-select" id="wan-vlan-mode" style="min-width:120px;width:130px;">
+                  <select class="vht-select" id="wan-vlan-mode" style="width:110px;">
                     <option value="TAG" ${w.vlanMode === "TAG" ? "selected" : ""}>TAG</option>
                     <option value="UNTAG" ${w.vlanMode === "UNTAG" ? "selected" : ""}>UNTAG</option>
                   </select>
                   &nbsp; VLAN ID:
                   <input type="number" class="vht-input short" id="wan-vlan-id" value="${w.vlanId}" />
                   &nbsp; 802.1p:
-                  <input type="number" class="vht-input short" id="wan-pbit" value="${w.pbit}" style="width:70px;min-width:70px;" />
+                  <input type="number" class="vht-input short" id="wan-pbit" value="${w.pbit}" style="width:70px;" />
                 </td>
               </tr>
               <tr>
-                <th>Port Binding (Ánh xạ cổng):</th>
+                <th>Port Binding</th>
                 <td>
                   <div class="check-grid">
                     ${allPorts
@@ -829,8 +847,8 @@
                 </td>
               </tr>
             </table>
-            <div class="btn-row">
-              <button class="btn-vht" id="wan-btn-apply">ÁP DỤNG</button>
+            <div class="btn-row center">
+              <button class="btn-vht pill-lg" id="wan-btn-apply">ÁP DỤNG</button>
             </div>
           </div>
         </div>
@@ -897,64 +915,56 @@
 
       return `
         <div class="vht-card">
-          <div class="vht-card-header">1. Cấu hình IPv4 LAN &amp; Máy chủ cấp phát IP động (DHCP Server)</div>
+          <div class="vht-card-header">Thiết lập IPv4 LAN &amp; DHCP Server</div>
           <div class="vht-card-body">
             <table class="form-table">
               <tr>
-                <th>Địa chỉ IP (Default Gateway):</th>
+                <th>Địa chỉ IP</th>
                 <td><input type="text" class="vht-input med" id="lan-ip" value="${esc(lan.ip)}" /></td>
               </tr>
               <tr>
-                <th>Mặt nạ mạng con (Subnet Mask):</th>
-                <td><input type="text" class="vht-input med" id="lan-mask" value="${esc(lan.mask)}" /> <span class="field-hint">(/24 — Tối đa 254 host)</span></td>
+                <th>Mặt nạ mạng con</th>
+                <td><input type="text" class="vht-input med" id="lan-mask" value="${esc(lan.mask)}" /></td>
               </tr>
               <tr>
-                <th>DHCP Server:</th>
+                <th>DHCP Server</th>
                 <td>
                   <label class="check-item">
-                    <input type="checkbox" id="lan-dhcp-enable" ${lan.dhcpEnabled ? "checked" : ""} />
-                    <strong>Bật DHCP Server</strong> (Tự động cấp phát IP cho thiết bị tham gia mạng)
+                    <input type="checkbox" id="lan-dhcp-enable" ${lan.dhcpEnabled ? "checked" : ""} /> Bật
                   </label>
                 </td>
               </tr>
               <tr>
-                <th>Dải cấp phát DHCP (DHCP Pool):</th>
+                <th>Dải DHCP</th>
                 <td>
-                  Từ <input type="text" class="vht-input med" id="lan-dhcp-start" value="${esc(lan.dhcpStart)}" />
-                  đến <input type="text" class="vht-input med" id="lan-dhcp-end" value="${esc(lan.dhcpEnd)}" />
+                  <input type="text" class="vht-input med" id="lan-dhcp-start" value="${esc(lan.dhcpStart)}" />
+                  &nbsp;–&nbsp;
+                  <input type="text" class="vht-input med" id="lan-dhcp-end" value="${esc(lan.dhcpEnd)}" />
                 </td>
               </tr>
               <tr>
-                <th>Thời hạn thuê IP (Lease Time):</th>
-                <td>
-                  <input type="number" class="vht-input short" id="lan-lease" value="${lan.leaseMin}" />
-                  <span class="field-hint">phút (1 – 3600 phút; mặc định 1440 phút = 24 giờ)</span>
-                </td>
+                <th>Thời hạn thuê</th>
+                <td><input type="number" class="vht-input short" id="lan-lease" value="${lan.leaseMin}" /> phút</td>
               </tr>
               <tr>
-                <th>Cấp phát IP ngẫu nhiên:</th>
-                <td>
-                  <label class="check-item">
-                    <input type="checkbox" id="lan-random" ${lan.randomIp ? "checked" : ""} />
-                    Phát số IP ngẫu nhiên trong dải thay vì cấp tuần tự
-                  </label>
-                </td>
+                <th>Cấp phát IP ngẫu nhiên</th>
+                <td><input type="checkbox" id="lan-random" ${lan.randomIp ? "checked" : ""} /></td>
               </tr>
               <tr>
-                <th>Chế độ DNS:</th>
+                <th>Chế độ DNS</th>
                 <td>
                   <select class="vht-select" id="lan-dns-mode">
-                    <option value="Proxy" ${lan.dnsMode === "Proxy" ? "selected" : ""}>Proxy (Chuyển tiếp theo DNS cổng WAN nhà mạng)</option>
-                    <option value="Static" ${lan.dnsMode === "Static" ? "selected" : ""}>Static (Chỉ định máy chủ DNS cố định)</option>
+                    <option value="Proxy" ${lan.dnsMode === "Proxy" ? "selected" : ""}>Proxy</option>
+                    <option value="Static" ${lan.dnsMode === "Static" ? "selected" : ""}>Static</option>
                   </select>
                 </td>
               </tr>
               <tr id="lan-dns-static-row" style="display:${lan.dnsMode === "Static" ? "" : "none"};">
-                <th>DNS Chính / DNS Phụ:</th>
+                <th>DNS Chính / Phụ</th>
                 <td>
-                  <input type="text" class="vht-input med" id="lan-dns1" value="${esc(lan.staticDns1)}" placeholder="8.8.8.8" />
+                  <input type="text" class="vht-input med" id="lan-dns1" value="${esc(lan.staticDns1)}" />
                   &nbsp;
-                  <input type="text" class="vht-input med" id="lan-dns2" value="${esc(lan.staticDns2)}" placeholder="8.8.4.4" />
+                  <input type="text" class="vht-input med" id="lan-dns2" value="${esc(lan.staticDns2)}" />
                 </td>
               </tr>
             </table>
@@ -966,38 +976,33 @@
 
         <div class="vht-card">
           <div class="vht-card-header">
-            <span>2. Bảng cấp phát IP tĩnh theo địa chỉ MAC (Tối đa 8 thiết bị)</span>
-            <span class="badge-pill gray">${lan.staticLeases.length} / 8 thiết bị</span>
+            <span>Bảng cấp phát IP tĩnh</span>
+            <span class="badge-pill gray">${lan.staticLeases.length} / 8</span>
           </div>
           <div class="vht-card-body">
             <table class="form-table" style="margin-bottom:10px;">
               <tr>
-                <th>Địa chỉ IP muốn gán cứng:</th>
-                <td>
-                  <input type="text" class="vht-input med" id="static-ip-in" placeholder="192.168.1.150" />
-                  <span class="field-hint">Ví dụ: <code>192.168.1.150</code></span>
-                </td>
+                <th>Địa chỉ IP</th>
+                <td><input type="text" class="vht-input med" id="static-ip-in" placeholder="192.168.1.150" /></td>
               </tr>
               <tr>
-                <th>Địa chỉ vật lý MAC:</th>
+                <th>Địa chỉ MAC</th>
                 <td>
                   <input type="text" class="vht-input med" id="static-mac-in" placeholder="a4:83:e7:12:34:56" />
-                  <button type="button" class="btn-icon" id="static-fill-phone" title="Điền nhanh MAC của Điện thoại thử nghiệm">
-                    📱 Điền nhanh MAC Điện thoại (${esc(phone.mac)})
-                  </button>
+                  <button type="button" class="btn-icon" id="static-fill-phone">${esc(phone.mac)}</button>
                 </td>
               </tr>
             </table>
             <div class="btn-row" style="margin-bottom:14px;">
-              <button class="btn-vht" id="static-btn-add">THÊM &amp; ÁP DỤNG</button>
+              <button class="btn-vht" id="static-btn-add">THÊM</button>
             </div>
 
             <table class="data-table">
               <thead>
                 <tr>
                   <th>STT</th>
-                  <th>Địa chỉ IP cố định</th>
-                  <th>Địa chỉ MAC thiết bị</th>
+                  <th>Địa chỉ IP</th>
+                  <th>Địa chỉ MAC</th>
                   <th>Thao tác</th>
                 </tr>
               </thead>
@@ -1023,21 +1028,17 @@
         </div>
 
         <div class="vht-card">
-          <div class="vht-card-header">3. Cấu hình IPv6 LAN (SLAAC / Router Advertisement &amp; DHCPv6)</div>
+          <div class="vht-card-header">Cấu hình IPv6 LAN</div>
           <div class="vht-card-body">
             <table class="form-table">
               <tr>
-                <th>Cấp phát địa chỉ IPv6 nội bộ:</th>
+                <th>SLAAC / DHCPv6</th>
                 <td>
                   <div class="check-grid">
-                    <label class="check-item"><input type="checkbox" checked disabled /> Kích hoạt SLAAC (Router Advertisement)</label>
-                    <label class="check-item"><input type="checkbox" checked disabled /> Kích hoạt DHCPv6 Server</label>
+                    <label class="check-item"><input type="checkbox" checked disabled /> Router Advertisement (SLAAC)</label>
+                    <label class="check-item"><input type="checkbox" checked disabled /> DHCPv6 Server</label>
                   </div>
                 </td>
-              </tr>
-              <tr>
-                <th>Cờ RA (Managed / Other / EUI-64):</th>
-                <td><span class="field-hint" style="margin:0;">Đồng bộ tự động từ Prefix Delegation cổng WAN nhà mạng (${esc(lan.ipv6Prefix)}) — Khuyến nghị giữ mặc định.</span></td>
               </tr>
             </table>
           </div>
@@ -1059,7 +1060,7 @@
         lan.dhcpEnd = document.getElementById("lan-dhcp-end").value.trim();
         const lease = parseInt(document.getElementById("lan-lease").value, 10);
         if (isNaN(lease) || lease < 1 || lease > 3600) {
-          return alert("Thời hạn thuê IP (Lease Time) phải nằm trong khoảng từ 1 đến 3600 phút!");
+          return alert("Thời hạn thuê IP phải từ 1 đến 3600 phút!");
         }
         lan.leaseMin = lease;
         lan.randomIp = document.getElementById("lan-random").checked;
@@ -1067,9 +1068,7 @@
         lan.staticDns1 = document.getElementById("lan-dns1").value.trim();
         lan.staticDns2 = document.getElementById("lan-dns2").value.trim();
 
-        window.SimEngine.addLog(
-          "[LAN] Cập nhật DHCP (" + (lan.dhcpEnabled ? "Bật: " + lan.dhcpStart + " -> " + lan.dhcpEnd : "Tắt") + ")."
-        );
+        window.SimEngine.addLog("[LAN] Cập nhật DHCP (" + (lan.dhcpEnabled ? "Bật: " + lan.dhcpStart + " -> " + lan.dhcpEnd : "Tắt") + ").");
         window.RouterApp.applyWithFeedback("Đã lưu cấu hình mạng LAN & DHCP!");
       });
 
@@ -1090,31 +1089,20 @@
         const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
         const macColonRegex = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/;
 
-        if (!ipRegex.test(ip)) {
-          return alert("Địa chỉ IP không hợp lệ! Ví dụ hợp lệ: 192.168.1.150");
-        }
-        if (!macColonRegex.test(mac)) {
-          return alert("Địa chỉ MAC không hợp lệ! Vui lòng nhập định dạng xx:xx:xx:xx:xx:xx (ngăn cách bằng dấu hai chấm ':').");
-        }
+        if (!ipRegex.test(ip)) return alert("Địa chỉ IP không hợp lệ!");
+        if (!macColonRegex.test(mac)) return alert("Địa chỉ MAC không hợp lệ! Định dạng chuẩn: xx:xx:xx:xx:xx:xx");
         const dup = lan.staticLeases.find((x) => x.ip === ip || x.mac.toLowerCase() === mac.toLowerCase());
-        if (dup) {
-          return alert("Địa chỉ IP hoặc địa chỉ MAC này đã tồn tại trong bảng cấp phát tĩnh!");
-        }
+        if (dup) return alert("Địa chỉ IP hoặc MAC này đã tồn tại!");
 
         lan.staticLeases.push({ ip: ip, mac: mac.toLowerCase() });
-        window.SimEngine.addLog("[DHCP STATIC] Đã khóa cứng IP " + ip + " cho địa chỉ MAC " + mac.toLowerCase() + ".");
-        window.RouterApp.applyWithFeedback(
-          "Đã thêm cấp phát IP tĩnh " + ip + "! Hãy tắt/bật lại Wi-Fi trên Điện thoại mô phỏng để nhận IP mới."
-        );
+        window.SimEngine.addLog("[DHCP STATIC] Đã khóa cứng IP " + ip + " cho MAC " + mac.toLowerCase() + ".");
+        window.RouterApp.applyWithFeedback("Đã thêm cấp phát IP tĩnh " + ip + "!");
       });
 
       document.querySelectorAll(".static-del-btn").forEach(function (btn) {
         btn.addEventListener("click", function () {
           const i = parseInt(btn.getAttribute("data-idx"), 10);
-          const removed = window.SimState.lan.staticLeases.splice(i, 1)[0];
-          if (removed) {
-            window.SimEngine.addLog("[DHCP STATIC] Đã xóa gán IP tĩnh " + removed.ip + " (" + removed.mac + ").");
-          }
+          window.SimState.lan.staticLeases.splice(i, 1);
           window.SimEngine.saveState();
           window.RouterApp.renderCurrentPage();
           window.LabUI.render();

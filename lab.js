@@ -1,6 +1,6 @@
 /* ==========================================================================
-   lab.js — Collapsible Practice Lab Drawer:
-   1. TV1–TV6 Guided Rehearsal Coach & 1-Click Scene State Presets
+   lab.js — Single Consolidated Helper Panel (Hidden completely on F9):
+   1. TV1–TV6 Guided Rehearsal Coach + Context Quick-Fill Actions
    2. Virtual Test Smartphone (Wi-Fi Scanner, DHCP IP Renew, Mini Browser) & VMware
    3. Interactive Virtual Hardware vGP-42X6V1 (Live LEDs, Fiber LOS, Hard Reset, Sticker)
    ========================================================================== */
@@ -41,7 +41,7 @@
       steps: [
         {
           page: "deviceinfo",
-          html: "Mở <span class='step-jump'>Thông tin thiết bị</span>: Giải thích % <strong>Tải CPU / RAM</strong>, trạng thái <code>LAN1–4</code>, bảng quang <strong>GPON Class B+ / OLT ZTE</strong> (Công suất thu <code>-21.14 dBm</code> màu xanh lá: chuẩn <code>-8 ~ -27 dBm</code>) &amp; <code>TR-069</code>."
+          html: "Mở <span class='step-jump'>Thông tin thiết bị</span>: Giải thích <strong>Thông tin PON</strong> (Công suất thu <code>-21.1 dBm</code> xanh), <strong>Thông tin kết nối Internet</strong>, % <strong>Tải CPU / RAM</strong>, và thẻ <strong>WAN</strong>."
         },
         {
           page: "net-wan",
@@ -49,11 +49,11 @@
         },
         {
           page: "sta-users",
-          html: "<strong>Minh chứng Trước:</strong> Mở <span class='step-jump'>Thiết bị đang kết nối</span> xem Điện thoại đang nhận IP động <code>192.168.1.2</code>, bấm <strong>Copy MAC</strong>."
+          html: "<strong>Minh chứng Trước:</strong> Mở <span class='step-jump'>Thiết bị đang kết nối</span> xem Điện thoại đang nhận IP động <code>192.168.1.2</code>."
         },
         {
           page: "net-lan",
-          html: "Mở <span class='step-jump'>Mạng → Thiết lập LAN</span>: Sửa dải DHCP thành <code>.10 → .200</code>; ở <strong>Bảng cấp phát IP tĩnh</strong> gán cứng <code>192.168.1.150</code> + MAC điện thoại → Bấm <strong>THÊM &amp; ÁP DỤNG</strong> → Sang tab <strong>📱 ĐT</strong> tắt/bật lại Wi-Fi thấy nhận đúng <code>192.168.1.150</code>!"
+          html: "Mở <span class='step-jump'>Mạng → Thiết lập LAN</span>: Sửa dải DHCP thành <code>.10 → .200</code>; ở <strong>Bảng cấp phát IP tĩnh</strong> gán cứng <code>192.168.1.150</code> + MAC điện thoại → Bấm <strong>THÊM</strong> → Sang tab <strong>📱 ĐT</strong> tắt/bật lại Wi-Fi thấy nhận đúng <code>192.168.1.150</code>!"
         }
       ]
     },
@@ -63,11 +63,11 @@
       steps: [
         {
           page: "home",
-          html: "Mở <span class='step-jump'>Cài đặt nhanh</span>: Phân tích <strong>Chuyển băng tự động (Band Steering)</strong> Bật vs Tắt. Đảm bảo để <strong>BỎ TÍCH (Tắt)</strong> rồi bấm Áp dụng."
+          html: "Mở <span class='step-jump'>Cài đặt nhanh</span>: Phân tích công tắc <strong>Chuyển băng tự động (Band Steering)</strong> Bật vs Tắt. Đảm bảo để <strong>TẮT</strong> rồi bấm Áp dụng."
         },
         {
           page: "wifi",
-          html: "Mở <span class='step-jump'>Wi-Fi → Thiết lập Wi-Fi 2.4GHz</span>: Chọn <code>802.11b/g/n/ax</code>, đổi <code>Kênh</code> từ Auto sang <strong>Kênh 6</strong> (1-6-11 không chồng lấn), <code>Băng thông = 20 MHz</code>. Bấm nút <strong>NÂNG CAO</strong> giải thích <code>Công suất phát 100%</code> &amp; sửa <code>Số thiết bị</code> từ 45 → <strong>20</strong>."
+          html: "Mở <span class='step-jump'>Wi-Fi → Thiết lập Wi-Fi 2.4GHz</span>: Chọn <code>802.11b/g/n/ax</code>, đổi <code>Kênh</code> sang <strong>Kênh 6</strong> (1-6-11 không chồng lấn), <code>Băng thông = 20 MHz</code>. Bấm nút <strong>NÂNG CAO</strong> giải thích <code>Công suất phát 100%</code> &amp; sửa <code>Số thiết bị</code> từ 45 → <strong>20</strong>."
         },
         {
           page: "wifi",
@@ -89,7 +89,7 @@
         },
         {
           page: "wifi-mesh",
-          html: "Mở <span class='step-jump'>Wi-Fi → Wi-Fi Mesh</span>: Phân tích <code>Controller vs Agent</code>, so sánh EasyMesh (1 SSID roaming mượt) với Repeater cũ, rồi bấm xem <span class='step-jump' data-jump='wifi-mesh-topology'>Topology hiện tại</span>."
+          html: "Mở <span class='step-jump'>Wi-Fi → Wi-Fi Mesh</span>: Phân tích <code>Controller vs Agent</code>, so sánh EasyMesh với Repeater cũ, rồi bấm xem <span class='step-jump' data-jump='wifi-mesh-topology'>Topology hiện tại</span>."
         },
         {
           page: "sta-users",
@@ -128,7 +128,7 @@
       steps: [
         {
           page: "tools-time",
-          html: "Mở <span class='step-jump'>Bảo dưỡng → Giờ hệ thống</span> kiểm tra đồng bộ NTP <code>GMT+07:00</code> → Sang <span class='step-jump' data-jump='apps-wifischeduling'>Ứng dụng → Lập lịch Wi-Fi</span> đặt tắt sóng ở phút kế tiếp (có nút <strong>⏩ Tua +1 phút</strong> để xem đèn WLAN tắt &amp; sóng ngắt ngay!). Nhớ tắt lịch sau khi test."
+          html: "Mở <span class='step-jump'>Bảo dưỡng → Giờ hệ thống</span> kiểm tra đồng bộ NTP <code>GMT+07:00</code> → Sang <span class='step-jump' data-jump='apps-wifischeduling'>Ứng dụng → Lập lịch Wi-Fi</span> đặt tắt sóng ở phút kế tiếp (dùng nút <strong>⏩ Tua +1 phút</strong> ở khung bên dưới để xem đèn WLAN tắt &amp; sóng ngắt ngay!)."
         },
         {
           page: "apps-portforwarding",
@@ -136,7 +136,7 @@
         },
         {
           page: "tools-diagnostic",
-          html: "Mở <span class='step-jump'>Bảo dưỡng → Chẩn đoán mạng</span>: Chạy thử cả <strong>Ping</strong> và <strong>Traceroute</strong> tới <code>8.8.8.8</code>. Điểm nhanh <span class='step-jump' data-jump='tools-admin'>Quản trị (Khóa WAN, Timeout 5p)</span>, <span class='step-jump' data-jump='tools-wan2lan'>Uplink Mirroring (Wireshark)</span>, <span class='step-jump' data-jump='tools-firmware'>Firmware</span>, <span class='step-jump' data-jump='tools-log'>Bản ghi</span>, <span class='step-jump' data-jump='tools-reboot'>Khởi động lại</span>."
+          html: "Mở <span class='step-jump'>Bảo dưỡng → Chẩn đoán mạng</span>: Chạy thử cả <strong>Ping</strong> và <strong>Traceroute</strong> tới <code>8.8.8.8</code>. Điểm nhanh <span class='step-jump' data-jump='tools-admin'>Quản trị</span>, <span class='step-jump' data-jump='tools-wan2lan'>Uplink Mirroring</span>, <span class='step-jump' data-jump='tools-firmware'>Firmware</span>, <span class='step-jump' data-jump='tools-log'>Bản ghi</span>, <span class='step-jump' data-jump='tools-reboot'>Khởi động lại</span>."
         },
         {
           page: "tools-config",
@@ -179,13 +179,19 @@
       return `
         <div class="lab-section">
           <div class="lab-sec-title">
-            <span>🏷️ Mã SSID Nhóm (Quy định đề bài)</span>
+            <span>🏷️ Mã SSID Nhóm &amp; Công Cụ Điền Nhanh</span>
           </div>
-          <div style="display:flex;gap:6px;">
+          <div style="display:flex;gap:6px;margin-bottom:8px;">
             <input type="text" id="lab-group-ssid" value="${esc(st.coach.groupSsid)}"
               style="flex:1;padding:6px 9px;border-radius:5px;border:1px solid #475569;background:#0f172a;color:#fff;font-size:12.5px;"
               placeholder="Ví dụ: 24CLC01-N05" />
             <button type="button" class="btn-vht small" id="lab-save-group">Lưu mã</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+            <button type="button" class="lab-btn ghost" id="lab-q-fill-ssid" style="margin:0;padding:5px 6px;font-size:11px;">⚡ Điền SSID Nhóm</button>
+            <button type="button" class="lab-btn ghost" id="lab-q-fill-mac" style="margin:0;padding:5px 6px;font-size:11px;">📱 Điền MAC ĐT chuẩn ':'</button>
+            <button type="button" class="lab-btn ghost" id="lab-q-fill-badmac" style="margin:0;padding:5px 6px;font-size:11px;">⚠️ Thử MAC dấu '-' (Bẫy)</button>
+            <button type="button" class="lab-btn ghost" id="lab-q-plus1m" style="margin:0;padding:5px 6px;font-size:11px;">⏩ Tua giờ Router +1p</button>
           </div>
         </div>
 
@@ -231,6 +237,40 @@
         window.SimState.coach.groupSsid = val;
         window.SimEngine.saveState();
         window.RouterApp.showToast("Đã cập nhật mã SSID nhóm: " + val);
+        window.RouterApp.renderCurrentPage();
+        self.render();
+      });
+
+      document.getElementById("lab-q-fill-ssid").addEventListener("click", function () {
+        const b24 = document.getElementById("w24-fill-group");
+        const b5 = document.getElementById("w5-fill-group");
+        if (b24) b24.click();
+        else if (b5) b5.click();
+        else window.RouterApp.showToast("Hãy mở trang Thiết lập Wi-Fi 2.4GHz hoặc 5GHz trước!");
+      });
+
+      document.getElementById("lab-q-fill-mac").addEventListener("click", function () {
+        const bLan = document.getElementById("static-fill-phone");
+        const bPc = document.getElementById("pc-fill-colon");
+        if (bLan) bLan.click();
+        else if (bPc) bPc.click();
+        else {
+          if (navigator.clipboard) navigator.clipboard.writeText(window.SimState.simDevices.phone.mac);
+          window.RouterApp.showToast("Đã copy MAC Điện thoại: " + window.SimState.simDevices.phone.mac);
+        }
+      });
+
+      document.getElementById("lab-q-fill-badmac").addEventListener("click", function () {
+        const bPcBad = document.getElementById("pc-fill-hyphen");
+        if (bPcBad) bPcBad.click();
+        else window.RouterApp.showToast("Hãy mở trang Kiểm soát con cái -> bấm THÊM trước!");
+      });
+
+      document.getElementById("lab-q-plus1m").addEventListener("click", function () {
+        window.SimState.admin.clockOffsetSec = (window.SimState.admin.clockOffsetSec || 0) + 60;
+        window.SimEngine.reconcileClients();
+        window.SimEngine.saveState();
+        window.RouterApp.showToast("Đã tua nhanh đồng hồ Router +1 phút!");
         window.RouterApp.renderCurrentPage();
         self.render();
       });
@@ -302,17 +342,17 @@
                 ? `<div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">Wi-Fi trên điện thoại đang Tắt. Bật lại ở góc trên để quét sóng &amp; nhận lại IP DHCP!</div>`
                 : `
               <div style="font-size:11.5px;color:#94a3b8;margin-bottom:6px;display:flex;justify-content:space-between;">
-                <span>Danh sách mạng Wi-Fi quét được (${visibleNets.length}):</span>
+                <span>Danh sách mạng Wi-Fi (${visibleNets.length}):</span>
                 <span style="color:#38bdf8;cursor:pointer;" id="ph-reconnect-dhcp">🔄 Tắt/Bật nhận lại IP</span>
               </div>
 
               ${
                 schedOff
                   ? `<div style="background:#451a03;border:1px solid #d97706;color:#fde68a;padding:8px;border-radius:6px;font-size:11.5px;margin-bottom:8px;">
-                      ⏰ Bộ phát sóng Wi-Fi trên Router đang TẮT theo <strong>Lập lịch Wi-Fi (${esc(schedOff.start)}–${esc(schedOff.end)})</strong>! Không dò thấy sóng.
+                      ⏰ Bộ phát sóng Wi-Fi trên Router đang TẮT theo <strong>Lập lịch Wi-Fi (${esc(schedOff.start)}–${esc(schedOff.end)})</strong>!
                     </div>`
                   : visibleNets.length === 0
-                  ? `<div style="color:#94a3b8;font-size:12px;padding:8px;">Không có mạng Wi-Fi nào đang quảng bá (hoặc tất cả đang bật Ẩn SSID).</div>`
+                  ? `<div style="color:#94a3b8;font-size:12px;padding:8px;">Không có mạng Wi-Fi nào đang quảng bá.</div>`
                   : visibleNets
                       .map((n) => {
                         const isConn = phone.connected && phone.ssid === n.ssid;
@@ -595,11 +635,11 @@
           <div class="lab-sec-title"><span>🧪 Giả Lập Tình Huống Thực Tế &amp; Bẫy Kỹ Thuật</span></div>
           <label class="check-item" style="margin-bottom:8px;color:#e2e8f0;">
             <input type="checkbox" id="hw-lan1-cable" ${lan1Up ? "checked" : ""} />
-            <strong>Cắm dây cáp mạng LAN1 vào Laptop OBS</strong> (Bỏ tích để thấy bẫy rớt trang quản trị khi đổi SSID bằng Wi-Fi!)
+            <strong>Cắm dây cáp mạng LAN1 vào Laptop OBS</strong>
           </label>
           <label class="check-item" style="color:#fca5a5;">
             <input type="checkbox" id="hw-fiber-fault" ${dev.fiberFault ? "checked" : ""} />
-            <strong>Giả lập gập/lỏng đầu dây cáp quang xanh lá</strong> (Đèn LOS chớp đỏ &amp; Công suất thu quang chuyển đỏ <code>-31.85 dBm</code>)
+            <strong>Giả lập gập/lỏng đầu dây cáp quang xanh lá (LOS đỏ)</strong>
           </label>
         </div>
       `;
@@ -636,7 +676,7 @@
             window.SimEngine.performFactoryReset("Chọc nút Reset cứng vật lý 15 giây");
             if (wasWifiLaptop) {
               window.RouterApp.logout(
-                "Laptop của bạn đang bắt Wi-Fi thay vì cắm dây LAN1, nên khi Reset cứng làm mất sóng cũ, phiên kết nối 192.168.1.1 đã bị ngắt! (Mẹo số 4: Hãy cắm dây LAN1 khi quay OBS)."
+                "Laptop của bạn đang bắt Wi-Fi thay vì cắm dây LAN1, nên khi Reset cứng làm mất sóng cũ, phiên kết nối 192.168.1.1 đã bị ngắt!"
               );
             }
             window.RouterApp.renderAll();

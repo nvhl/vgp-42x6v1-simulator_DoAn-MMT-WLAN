@@ -1,13 +1,13 @@
 /* ==========================================================================
-   app.js — Main Router Shell Controller, Sidebar Accordion, Login, Idle Timeout,
-   Reboot Progress Modal, Live 1s Clock/Schedule Ticker & OBS Fullscreen Mode
+   app.js — Main Router Shell Controller, Clean Sidebar Accordion, Login,
+   Idle Timeout, Reboot Progress Modal, Live 1s Clock/Schedule Ticker & F9 Mode
    ========================================================================== */
 
 (function () {
   const NAV_GROUPS = [
     {
       id: "grp-net",
-      title: "🌐 Mạng",
+      title: "Mạng",
       items: [
         { key: "net-wan", label: "Thiết lập WAN" },
         { key: "net-lan", label: "Thiết lập LAN" }
@@ -15,7 +15,7 @@
     },
     {
       id: "grp-wifi",
-      title: "📶 Wi-Fi",
+      title: "Wi-Fi",
       items: [
         { key: "wifi", label: "Thiết lập Wi-Fi 2.4GHz" },
         { key: "wifi-11ac", label: "Thiết lập Wi-Fi 5GHz" },
@@ -24,7 +24,7 @@
     },
     {
       id: "grp-sec",
-      title: "🛡️ An ninh",
+      title: "An ninh",
       items: [
         { key: "fw-spi", label: "Tường lửa" },
         { key: "fw-parentalcontrol", label: "Kiểm soát con cái" }
@@ -32,7 +32,7 @@
     },
     {
       id: "grp-apps",
-      title: "🧩 Ứng dụng",
+      title: "Ứng dụng",
       items: [
         { key: "apps-dmz", label: "DMZ" },
         { key: "apps-portforwarding", label: "Port Forwarding" },
@@ -44,7 +44,7 @@
     },
     {
       id: "grp-tools",
-      title: "🔧 Bảo dưỡng",
+      title: "Bảo dưỡng",
       items: [
         { key: "tools-admin", label: "Quản trị" },
         { key: "tools-wan2lan", label: "Uplink Mirroring" },
@@ -59,16 +59,16 @@
   ];
 
   const TOP_ITEMS = [
-    { key: "home", label: "⚡ Cài đặt nhanh" },
-    { key: "deviceinfo", label: "📊 Thông tin thiết bị" },
-    { key: "sta-users", label: "💻 Thiết bị đang kết nối" },
-    { key: "wifi-mesh-topology", label: "🌳 Topology hiện tại" }
+    { key: "home", label: "Cài đặt nhanh" },
+    { key: "deviceinfo", label: "Thông tin thiết bị" },
+    { key: "sta-users", label: "Thiết bị đang kết nối" },
+    { key: "wifi-mesh-topology", label: "Topology hiện tại" }
   ];
 
   window.RouterApp = {
     loggedIn: false,
     currentPage: "home",
-    openGroups: { "grp-net": true, "grp-wifi": true, "grp-sec": false, "grp-apps": false, "grp-tools": true },
+    openGroups: { "grp-net": false, "grp-wifi": false, "grp-sec": false, "grp-apps": false, "grp-tools": false },
     idleRemainingSec: 300,
     lastScheduleState: false,
     toastTimer: null,
@@ -80,7 +80,6 @@
       this.lastScheduleState = !!window.SimEngine.isWifiScheduledOff();
       this.renderAll();
 
-      // Reset idle timeout on user activity inside router viewport
       const self = this;
       document.querySelector(".router-viewport").addEventListener("click", function () {
         self.resetIdleTimer();
@@ -89,7 +88,6 @@
         self.resetIdleTimer();
       });
 
-      // Global shortcut F9 for clean OBS preview mode
       document.addEventListener("keydown", function (e) {
         if (e.key === "F9") {
           e.preventDefault();
@@ -97,7 +95,6 @@
         }
       });
 
-      // 1-second live ticker (Uptime, System Time, Idle Timeout, Wi-Fi Schedule Trigger)
       setInterval(function () {
         self.tickOneSecond();
       }, 1000);
@@ -194,7 +191,6 @@
     navigate: function (pageKey) {
       if (!window.RouterPages[pageKey]) pageKey = "home";
       this.currentPage = pageKey;
-      // Auto-expand parent group in sidebar
       for (const g of NAV_GROUPS) {
         if (g.items.some((it) => it.key === pageKey)) {
           this.openGroups[g.id] = true;
@@ -202,6 +198,7 @@
       }
       this.renderSidebar();
       this.renderCurrentPage();
+      window.LabUI.render();
     },
 
     renderShellVisibility: function () {
@@ -213,22 +210,8 @@
     },
 
     renderTopStatusChips: function () {
-      const st = window.SimState;
-      const fault = st.device.fiberFault;
-      const schedOff = window.SimEngine.isWifiScheduledOff();
       const topInfo = document.getElementById("topbar-live-chips");
-      if (!topInfo) return;
-
-      topInfo.innerHTML = `
-        <span class="vht-status-chip">
-          <span class="${fault ? "dot-offline" : "dot-online"}"></span>
-          PON: ${fault ? "LOS Đỏ" : "O5 (-21.14 dBm)"}
-        </span>
-        <span class="vht-status-chip">
-          <span class="${schedOff || !st.wifi24.enabled ? "dot-offline" : "dot-online"}"></span>
-          SSID: ${st.wifi24.ssids[0].ssid}
-        </span>
-      `;
+      if (topInfo) topInfo.innerHTML = "";
     },
 
     renderSidebar: function () {
@@ -246,7 +229,7 @@
           <div class="nav-group ${isOpen ? "open" : ""}" data-grp="${g.id}">
             <div class="nav-group-header" data-grp-toggle="${g.id}">
               <span class="nav-group-title">${g.title}</span>
-              <span class="nav-caret">▶</span>
+              <span class="nav-caret">⌄</span>
             </div>
             <div class="nav-sub-list">
               ${g.items
@@ -279,20 +262,13 @@
     },
 
     renderCurrentPage: function () {
-      this.renderTopStatusChips();
       if (!this.loggedIn) return;
       const pageDef = window.RouterPages[this.currentPage] || window.RouterPages["home"];
       this.updateUrlBar(pageDef.cgi);
 
       const main = document.getElementById("vht-main-content");
       main.innerHTML = `
-        <div class="page-breadcrumb">
-          <span>${pageDef.group} &nbsp;/&nbsp; <strong>${pageDef.title}</strong></span>
-          <span class="cgi-tag">${pageDef.cgi}</span>
-        </div>
-        <div class="page-title">
-          <span>${pageDef.title}</span>
-        </div>
+        <div class="page-title">${pageDef.title}</div>
         <div id="cgi-page-inner">${pageDef.render()}</div>
       `;
 
@@ -315,7 +291,7 @@
       clearTimeout(this.toastTimer);
       this.toastTimer = setTimeout(function () {
         el.style.display = "none";
-      }, 3400);
+      }, 3200);
     },
 
     applyWithFeedback: function (msg, wifiPrimarySsidChanged) {
@@ -324,11 +300,10 @@
       window.LabUI.render();
       this.showToast(msg);
 
-      // Firmware Trap #4 Warning if Laptop OBS was connected over Wi-Fi instead of LAN1 cable!
       if (wifiPrimarySsidChanged && window.SimState.simDevices.laptopObs.connMode === "WIFI") {
         setTimeout(function () {
           alert(
-            "⚠️ [Mô phỏng Bẫy kỹ thuật số 4]:\n\nLaptop của bạn đang kết nối với Router qua sóng Wi-Fi thay vì cắm dây cáp mạng LAN1! Khi bạn đổi Tên Wi-Fi (SSID) hoặc mật khẩu, Laptop sẽ bị văng khỏi sóng Wi-Fi cũ và trang 192.168.1.1 sẽ xoay vòng mất kết nối.\n\n👉 Khi quay thật trên OBS, hãy cắm 1 sợi cáp LAN vào cổng LAN1 để chuyển trang mượt 100%!"
+            "⚠️ [Mô phỏng Bẫy kỹ thuật số 4]:\n\nLaptop của bạn đang kết nối với Router qua sóng Wi-Fi thay vì cắm dây cáp mạng LAN1! Khi bạn đổi Tên Wi-Fi (SSID) hoặc mật khẩu, Laptop sẽ bị văng khỏi sóng Wi-Fi cũ.\n\n👉 Khi quay thật trên OBS, hãy cắm 1 sợi cáp LAN vào cổng LAN1!"
           );
         }, 120);
       }
@@ -359,19 +334,17 @@
     tickOneSecond: function () {
       const st = window.SimState;
       st.device.uptimeSec = (st.device.uptimeSec || 0) + 1;
+      const pad = (n) => String(n).padStart(2, "0");
 
-      // Update Uptime text live if on deviceinfo
       const upEl = document.getElementById("devinfo-uptime");
       if (upEl) {
         const sec = st.device.uptimeSec;
-        const d = Math.floor(sec / 86400);
-        const h = Math.floor((sec % 86400) / 3600);
+        const h = Math.floor(sec / 3600);
         const m = Math.floor((sec % 3600) / 60);
         const s = sec % 60;
-        upEl.textContent = d + " ngày " + h + " giờ " + m + " phút " + s + " giây";
+        upEl.textContent = pad(h) + ":" + pad(m) + ":" + pad(s);
       }
 
-      // Update live clocks if visible
       const now = window.SimEngine.nowRouterDate();
       const nowStr = window.SimEngine.formatDateTime(now);
       const tClock = document.getElementById("tools-live-clock");
@@ -379,12 +352,10 @@
       const wClock = document.getElementById("wsch-live-clock");
       if (wClock) wClock.textContent = nowStr + " (" + window.SimEngine.getDayCode(now) + ")";
 
-      // Check Wi-Fi Schedule transition!
       const curSchedOff = !!window.SimEngine.isWifiScheduledOff();
       if (curSchedOff !== this.lastScheduleState) {
         this.lastScheduleState = curSchedOff;
         window.SimEngine.reconcileClients();
-        this.renderTopStatusChips();
         if (this.currentPage === "apps-wifischeduling" || this.currentPage === "sta-users") {
           this.renderCurrentPage();
         }
@@ -396,18 +367,17 @@
         );
       }
 
-      // Update Idle Session Countdown (Trap #3: 5 minutes = 300s)
       const badge = document.getElementById("sim-session-timer");
       if (this.loggedIn && st.admin.sessionTimeoutMin > 0) {
         this.idleRemainingSec = Math.max(0, this.idleRemainingSec - 1);
-        const mm = String(Math.floor(this.idleRemainingSec / 60)).padStart(2, "0");
-        const ss = String(this.idleRemainingSec % 60).padStart(2, "0");
+        const mm = pad(Math.floor(this.idleRemainingSec / 60));
+        const ss = pad(this.idleRemainingSec % 60);
         if (badge) badge.textContent = "Timeout: " + mm + ":" + ss;
         if (this.idleRemainingSec === 0) {
           this.logout(
             "⏱️ [Bẫy kỹ thuật số 3 — Hết phiên 5 phút (300s)]:\n\nBạn đứng thuyết minh quá " +
               st.admin.sessionTimeoutMin +
-              " phút mà không bấm chuột nên Firmware V1302250508 đã tự động đăng xuất về màn hình đăng nhập!"
+              " phút mà không bấm chuột nên Firmware đã tự động đăng xuất về màn hình đăng nhập!"
           );
         }
       } else if (badge) {
