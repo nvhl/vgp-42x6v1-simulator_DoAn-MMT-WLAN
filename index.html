@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mô Phỏng Luyện Tập Router Viettel vGP-42X6V1 (Firmware V1302250508) — Đồ Án WLAN CSC10008</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Top Simulator & Virtual Browser Bar (Hidden in F9 OBS Fullscreen Mode) -->
+  <div class="sim-browser-bar">
+    <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1;">
+      <span class="sim-pill edu">🎓 MÔ PHỎNG LUYỆN TẬP OFFLINE (CSC10008 - WLAN)</span>
+      <div class="sim-url-box">
+        <span class="sim-https-badge">🔒 Tự ký HTTPS</span>
+        <span class="sim-url-text" id="sim-cgi-url">https://192.168.1.1/cgi-bin/login.asp</span>
+      </div>
+    </div>
+
+    <div class="sim-bar-badges">
+      <span class="sim-pill warn" id="sim-session-timer" title="Bẫy kỹ thuật số 3: Mặc định 5 phút không bấm chuột sẽ tự đăng xuất">Timeout: 05:00</span>
+      <button type="button" class="sim-bar-btn secondary" id="btn-obs-mode" title="Ẩn toàn bộ thanh mô phỏng để luyện khung hình OBS sạch 100% (Phím tắt F9)">
+        🖥️ Khung hình OBS (F9)
+      </button>
+      <button type="button" class="sim-bar-btn" id="btn-toggle-lab">
+        🎛️ Bàn Luyện Tập (TV1–TV6 / ĐT / Phần Cứng)
+      </button>
+    </div>
+  </div>
+
+  <!-- Floating Exit OBS Fullscreen Button -->
+  <button type="button" class="obs-exit-fab" id="btn-exit-obs">
+    🎛️ Thoát chế độ toàn màn hình OBS (F9)
+  </button>
+
+  <!-- Main Split Workspace: Left = Router WebUI | Right = Collapsible Practice Lab -->
+  <div class="workspace-split">
+    <div class="router-viewport">
+      <!-- 1. LOGIN SCREEN -->
+      <div class="login-screen" id="login-view">
+        <div class="login-card">
+          <div class="login-edu-banner">
+            🎓 BẢN MÔ PHỎNG LUYỆN TẬP OFFLINE — KHÔNG PHẢI ROUTER THẬT (DỮ LIỆU CHỈ LƯU TRÊN TRÌNH DUYỆT)
+          </div>
+          <div class="login-header">
+            <div class="vht-logo-mark">VIETTEL HIGH TECH</div>
+            <div class="vht-logo-sub">GPON Wi-Fi 6 AX3000 Home Gateway — Model <strong>vGP-42X6V1</strong></div>
+          </div>
+          <div class="login-body">
+            <div class="login-error" id="login-err"></div>
+            <form id="login-form" autocomplete="off">
+              <div class="login-field">
+                <label for="login-user">Tên đăng nhập (Username)</label>
+                <input type="text" id="login-user" value="admin" placeholder="admin" required />
+              </div>
+              <div class="login-field">
+                <label for="login-pass">Mật khẩu quản trị (Password)</label>
+                <input type="password" id="login-pass" value="VTGR2239D5BC" placeholder="Nhập mã GPON S/N trên tem đáy" required />
+              </div>
+              <button type="submit" class="btn-login-submit">ĐĂNG NHẬP</button>
+            </form>
+
+            <div class="login-hint-box">
+              <div>
+                <strong>Gợi ý tem mặt đáy:</strong><br />
+                User: <code>admin</code> | Pass: <code>VTGR2239D5BC</code>
+              </div>
+              <button type="button" class="btn-quick-fill" id="btn-quick-fill-login">⚡ Điền nhanh</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. ROUTER ADMIN SHELL (25 CGI PAGES) -->
+      <div class="router-shell" id="admin-shell-view" style="display:none;">
+        <header class="vht-topbar">
+          <div class="vht-brand">
+            <span class="vht-brand-badge">VIETTEL</span>
+            <div class="vht-model-info">
+              <span class="vht-model-title">vGP-42X6V1 — Dual-Band Wi-Fi 6 GPON ONT</span>
+              <span class="vht-model-sub">VHT (Viettel High Tech) &nbsp;|&nbsp; Firmware: <strong>V1302250508</strong></span>
+            </div>
+          </div>
+
+          <div class="vht-topbar-right">
+            <div id="topbar-live-chips" style="display:flex;gap:8px;align-items:center;"></div>
+            <select class="vht-select" style="min-width:110px;width:115px;padding:4px 8px;font-size:12px;">
+              <option selected>🇻🇳 Tiếng Việt</option>
+              <option disabled>🇬🇧 English</option>
+            </select>
+            <button type="button" class="btn-logout" id="btn-logout">Đăng xuất</button>
+          </div>
+        </header>
+
+        <div class="vht-body">
+          <aside class="vht-sidebar" id="vht-sidebar"></aside>
+          <main class="vht-main" id="vht-main-content"></main>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. RIGHT COLLAPSIBLE PRACTICE LAB DRAWER -->
+    <aside class="lab-drawer" id="lab-drawer">
+      <div class="lab-tabs">
+        <button type="button" class="lab-tab active" data-tab="coach">🎬 Kịch bản TV1–6</button>
+        <button type="button" class="lab-tab" data-tab="phone">📱 ĐT &amp; VMware</button>
+        <button type="button" class="lab-tab" data-tab="hw">📟 Phần cứng</button>
+      </div>
+      <div class="lab-content" id="lab-drawer-body"></div>
+    </aside>
+  </div>
+
+  <!-- Toast & Reboot Progress Modal -->
+  <div class="toast-msg" id="sim-toast"></div>
+  <div class="overlay-modal" id="reboot-overlay">
+    <div class="overlay-box">
+      <div style="font-weight:800;font-size:16px;color:#ee0033;margin-bottom:8px;">Viettel vGP-42X6V1</div>
+      <div id="reboot-caption" style="font-size:13px;color:#334155;line-height:1.5;">Đang xử lý...</div>
+      <div class="progress-track">
+        <div class="progress-bar-fill" id="reboot-bar-fill"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="state.js"></script>
+  <script src="pages-overview-net.js"></script>
+  <script src="pages-wifi-sec.js"></script>
+  <script src="pages-apps-tools.js"></script>
+  <script src="lab.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

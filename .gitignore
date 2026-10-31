@@ -1,0 +1,10 @@
+# Prevent accidental commit of real router backup files or personal coursework docs
+*.cfg
+*.bin
+*.trx
+*.mp3
+*.mp4
+*.pdf
+*.docx
+.DS_Store
+Thumbs.db
