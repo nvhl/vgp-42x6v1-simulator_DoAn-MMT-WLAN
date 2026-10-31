@@ -790,68 +790,90 @@
 
   // --------------------------------------------------------------------------
   // 4. Topology hiện tại (/cgi-bin/wifi-mesh-topology.asp)
-  //    Sub-tabs: Cơ bản | Trạng thái, Legend: Runtime Topology
+  //    Standalone page (ul-tab commented out in firmware), Legend: Runtime Topology
   // --------------------------------------------------------------------------
   window.RouterPages["wifi-mesh-topology"] = {
     title: "",
     group: "Tổng quan",
     cgi: "/cgi-bin/wifi-mesh-topology.asp",
     showTable: true,
+    selectedNode: "controller",
+    openSections: { overview: true, apcap: false, bhinfo: false, clinfo: true },
     render: function () {
       const st = window.SimState;
       const clients = [];
       if (st.simDevices.laptopObs.connMode === "LAN1") {
-        clients.push({ name: st.simDevices.laptopObs.name, medium: "Ethernet (LAN1)", mac: st.simDevices.laptopObs.mac, ip: st.simDevices.laptopObs.ip, rssi: "N/A" });
+        clients.push({
+          name: st.simDevices.laptopObs.name,
+          medium: "Ethernet",
+          mac: st.simDevices.laptopObs.mac,
+          ip: st.simDevices.laptopObs.ip,
+          speed: "1000",
+          rssi: "-",
+          dl: "-",
+          ul: "-"
+        });
       }
       if (st.simDevices.desktopVm.connected) {
-        clients.push({ name: st.simDevices.desktopVm.name, medium: "Ethernet (LAN2)", mac: st.simDevices.desktopVm.mac, ip: st.simDevices.desktopVm.ip, rssi: "N/A" });
+        clients.push({
+          name: st.simDevices.desktopVm.name,
+          medium: "Ethernet",
+          mac: st.simDevices.desktopVm.mac,
+          ip: st.simDevices.desktopVm.ip,
+          speed: "1000",
+          rssi: "-",
+          dl: "-",
+          ul: "-"
+        });
       }
       if (st.simDevices.phone.wifiOn && st.simDevices.phone.connected && !window.SimEngine.isWifiScheduledOff()) {
         clients.push({
           name: st.simDevices.phone.name,
-          medium: "Wi-Fi " + st.simDevices.phone.band + " (" + st.simDevices.phone.ssid + ")",
+          medium: st.simDevices.phone.band === "5GHz" ? "5G" : "2.4G",
           mac: st.simDevices.phone.mac,
           ip: st.simDevices.phone.ip,
-          rssi: st.simDevices.phone.rssi + " dBm"
+          speed: String(st.simDevices.phone.speed || 780),
+          rssi: String(st.simDevices.phone.rssi || -57),
+          dl: "12",
+          ul: "4"
         });
       }
       if (st.simDevices.laptopAux.connected && !window.SimEngine.isWifiScheduledOff()) {
         clients.push({
           name: st.simDevices.laptopAux.name,
-          medium: "Wi-Fi " + st.simDevices.laptopAux.band + " (" + st.simDevices.laptopAux.ssid + ")",
+          medium: st.simDevices.laptopAux.band === "5GHz" ? "5G" : "2.4G",
           mac: st.simDevices.laptopAux.mac,
           ip: st.simDevices.laptopAux.ip,
-          rssi: st.simDevices.laptopAux.rssi + " dBm"
+          speed: String(st.simDevices.laptopAux.speed || 305),
+          rssi: String(st.simDevices.laptopAux.rssi || -68),
+          dl: "8",
+          ul: "2"
         });
       }
 
-      return `
-        <div class="vht-subtabs">
-          <span class="vht-subtab" id="topo-tab-basic">Cơ bản</span>
-          <span class="vht-subtab active">Trạng thái</span>
-        </div>
+      const isAgentSel = this.selectedNode === "agent" && st.mesh.demoAgentConnected;
+      const nodeTitle = isAgentSel ? "Agent - 32X6V1 (24:0b:2b:01:c9:e4)" : "Controller - 42X6V1 (" + st.device.macLan.toLowerCase() + ")";
 
+      return `
         <div class="vht-card">
           <div class="vht-card-body">
-            <div class="sub-heading" style="margin-top:0;">Runtime Topology</div>
-            <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-              <button type="button" class="btn-vht secondary small" id="topo-reset-view">Reset View</button>
-              <button type="button" class="btn-vht secondary small" id="topo-close-table">${this.showTable ? "Close Table" : "Open Table"}</button>
-              <button type="button" class="btn-vht secondary small" id="topo-save">Save Topo</button>
-              <button type="button" class="btn-vht secondary small" id="topo-clear">Clear Topo</button>
-              <button type="button" class="btn-vht outline small" id="topo-toggle-agent">
-                ${st.mesh.demoAgentConnected ? "Ngắt Node Agent" : "+ Ghép thử Node Agent"}
-              </button>
-            </div>
+            <legend class="vht-legend" style="margin-top:0;">Runtime Topology</legend>
 
-            <div class="topo-canvas">
-              <div class="topo-node">
-                <div style="font-size:11px;color:#ee0033;font-weight:800;">EASYMESH ${esc(st.mesh.role.toUpperCase())}</div>
-                <div style="font-size:15px;font-weight:800;margin:3px 0;">${esc(st.device.model)}</div>
-                <div style="font-size:12px;color:#475569;">AL-MAC: ${esc(st.device.macLan)} | IP: ${esc(st.lan.ip)}</div>
+            <div class="topo-canvas" style="min-height:240px;margin:10px 0 16px;">
+              <div class="topo-node" id="topo-node-ctrl" style="cursor:pointer;border:2px solid ${!isAgentSel ? "#ee0033" : "#cbd5e1"};">
+                <div style="font-size:13px;font-weight:700;color:#1f2937;">Controller - 42X6V1</div>
+                <div style="font-size:12px;color:#475569;margin-top:3px;">${esc(st.device.macLan.toLowerCase())}</div>
               </div>
 
-              <div class="topo-children">
+              <div style="display:${st.mesh.demoAgentConnected ? "flex" : "none"};flex-direction:column;align-items:center;">
+                <div style="font-size:11.5px;color:#16a34a;font-weight:700;margin:4px 0;">│ 5G (RSSI: -61 dBm)</div>
+                <div class="topo-node agent" id="topo-node-agent" style="cursor:pointer;border:2px solid ${isAgentSel ? "#ee0033" : "#cbd5e1"};">
+                  <div style="font-size:13px;font-weight:700;color:#1f2937;">Agent - 32X6V1</div>
+                  <div style="font-size:12px;color:#475569;margin-top:3px;">24:0b:2b:01:c9:e4</div>
+                </div>
+              </div>
+
+              <div class="topo-children" style="margin-top:14px;">
                 ${
                   clients.length === 0
                     ? `<div class="field-hint">Chưa có thiết bị kết nối.</div>`
@@ -860,61 +882,140 @@
                           (c) => `
                   <div class="topo-client">
                     <div style="font-weight:700;color:#0f172a;">${esc(c.name)}</div>
-                    <div style="color:#16a34a;font-weight:600;margin-top:2px;">${esc(c.medium)}</div>
-                    <div style="color:#64748b;margin-top:2px;">MAC: ${esc(c.mac)} | RSSI: ${esc(c.rssi)}</div>
+                    <div style="color:#16a34a;font-weight:600;margin-top:2px;">${esc(c.medium)} (${esc(c.speed)} Mbps)</div>
+                    <div style="color:#64748b;margin-top:2px;">${esc(c.mac)} | IP: ${esc(c.ip)}</div>
                   </div>`
                         )
                         .join("")
                 }
               </div>
+            </div>
 
-              ${
-                st.mesh.demoAgentConnected
-                  ? `
-                <div class="topo-node agent">
-                  <div style="font-size:11px;color:#2563eb;font-weight:800;">EASYMESH AGENT (HOP 1)</div>
-                  <div style="font-size:14px;font-weight:800;margin:3px 0;">Home Wi-Fi H196A</div>
-                  <div style="font-size:12px;color:#475569;">Backhaul 5GHz (-61 dBm) | IP: 192.168.1.250</div>
-                </div>`
-                  : ""
-              }
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+              <div style="display:flex;gap:8px;">
+                <button type="button" class="btn-vht secondary small" id="topo-reset-view">↻ Reset View</button>
+                <button type="button" class="btn-vht secondary small" id="topo-close-table">${this.showTable ? "✕ Close Table" : "☰ Open Table"}</button>
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button type="button" class="btn-vht small" id="topo-save">Save Topo</button>
+                <button type="button" class="btn-vht secondary small" id="topo-clear">Clear Topo</button>
+              </div>
             </div>
 
             ${
               this.showTable
                 ? `
-              <table class="simple-table table-bordered-radius" style="width:100%;margin-top:16px;">
-                <thead>
-                  <tr>
-                    <th>Thiết bị</th>
-                    <th>Vai trò / Kết nối</th>
-                    <th>Địa chỉ MAC</th>
-                    <th>Địa chỉ IP</th>
-                    <th>RSSI</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td><strong>${esc(st.device.model)}</strong></td>
-                    <td>Controller</td>
-                    <td>${esc(st.device.macLan)}</td>
-                    <td>${esc(st.lan.ip)}</td>
-                    <td>N/A</td>
-                  </tr>
-                  ${clients
-                    .map(
-                      (c) => `
-                    <tr>
-                      <td>${esc(c.name)}</td>
-                      <td>${esc(c.medium)}</td>
-                      <td>${esc(c.mac)}</td>
-                      <td>${esc(c.ip)}</td>
-                      <td>${esc(c.rssi)}</td>
-                    </tr>`
-                    )
-                    .join("")}
-                </tbody>
-              </table>`
+              <div id="info_box" style="margin-top:14px;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+                <div style="font-weight:700;font-size:15px;padding:12px 16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+                  ${esc(nodeTitle)}
+                </div>
+
+                <!-- 1. Overview -->
+                <div style="border-bottom:1px solid #e2e8f0;">
+                  <div class="topo-acc-hdr" data-sec="overview" style="padding:10px 16px;font-weight:700;color:#0284c7;cursor:pointer;display:flex;justify-content:space-between;">
+                    <span>Overview</span><span>⌄</span>
+                  </div>
+                  ${
+                    this.openSections.overview
+                      ? `
+                  <table class="data-table" style="border-top:1px solid #e2e8f0;">
+                    <tbody>
+                      <tr><td style="text-align:left;width:220px;">Serial Number</td><td style="text-align:left;">${isAgentSel ? "VTGRB201C9E4" : esc(st.device.serial)}</td></tr>
+                      <tr><td style="text-align:left;">Firmware Version</td><td style="text-align:left;">${isAgentSel ? "V1.6.6_VN" : esc(st.device.firmware)}</td></tr>
+                      <tr><td style="text-align:left;">Product class</td><td style="text-align:left;">${isAgentSel ? "vAP-32X6V1" : esc(st.device.model)}</td></tr>
+                      <tr><td style="text-align:left;">Device name</td><td style="text-align:left;">${isAgentSel ? "vthomeap6" : esc(st.device.name)}</td></tr>
+                    </tbody>
+                  </table>`
+                      : ""
+                  }
+                </div>
+
+                <!-- 2. AP Capabality -->
+                <div style="border-bottom:1px solid #e2e8f0;">
+                  <div class="topo-acc-hdr" data-sec="apcap" style="padding:10px 16px;font-weight:700;color:#0284c7;cursor:pointer;display:flex;justify-content:space-between;">
+                    <span>AP Capabality</span><span>⌄</span>
+                  </div>
+                  ${
+                    this.openSections.apcap
+                      ? `
+                  <table class="data-table" style="border-top:1px solid #e2e8f0;">
+                    <tbody>
+                      <tr><td style="text-align:left;width:220px;">LAN IP Address</td><td style="text-align:left;" colspan="2">${isAgentSel ? "192.168.1.222" : esc(st.lan.ip)}</td></tr>
+                      <tr><td style="text-align:left;font-weight:700;">Radio 0 (5GHz)</td><td style="text-align:left;" colspan="2">Channel: ${esc(st.wifi5.currentChannel || 153)} | SSID: ${esc(st.wifi5.ssids[0].ssid)}</td></tr>
+                      <tr><td style="text-align:left;font-weight:700;">Radio 1 (2.4GHz)</td><td style="text-align:left;" colspan="2">Channel: ${esc(st.wifi24.currentChannel || 12)} | SSID: ${esc(st.wifi24.ssids[0].ssid)}</td></tr>
+                    </tbody>
+                  </table>`
+                      : ""
+                  }
+                </div>
+
+                <!-- 3. Backhaul Information -->
+                <div style="border-bottom:1px solid #e2e8f0;">
+                  <div class="topo-acc-hdr" data-sec="bhinfo" style="padding:10px 16px;font-weight:700;color:#0284c7;cursor:pointer;display:flex;justify-content:space-between;">
+                    <span>Backhaul Information</span><span>⌄</span>
+                  </div>
+                  ${
+                    this.openSections.bhinfo
+                      ? `
+                  <table class="data-table" style="border-top:1px solid #e2e8f0;">
+                    <tbody>
+                      ${
+                        isAgentSel
+                          ? `
+                        <tr><td style="text-align:left;width:220px;">Distance from controller</td><td style="text-align:left;">1</td></tr>
+                        <tr><td style="text-align:left;">Upstream Device</td><td style="text-align:left;">${esc(st.device.macLan.toLowerCase())}</td></tr>
+                        <tr><td style="text-align:left;">Bachkhaul Type</td><td style="text-align:left;">5G</td></tr>
+                        <tr><td style="text-align:left;">PhyRate</td><td style="text-align:left;">648 Mbps</td></tr>
+                        <tr><td style="text-align:left;">RSSI</td><td style="text-align:left;">-61 dBm</td></tr>`
+                          : `<tr><td colspan="2" class="empty-row">Thiết bị hiện tại đóng vai trò Controller (Distance from controller: 0).</td></tr>`
+                      }
+                    </tbody>
+                  </table>`
+                      : ""
+                  }
+                </div>
+
+                <!-- 4. Clients List -->
+                <div>
+                  <div class="topo-acc-hdr" data-sec="clinfo" style="padding:10px 16px;font-weight:700;color:#0284c7;cursor:pointer;display:flex;justify-content:space-between;">
+                    <span>Clients List</span><span>⌄</span>
+                  </div>
+                  ${
+                    this.openSections.clinfo
+                      ? `
+                  <table class="data-table" style="border-top:1px solid #e2e8f0;">
+                    <thead>
+                      <tr>
+                        <th>MAC Address</th>
+                        <th>Band/Interace</th>
+                        <th>Link speed (Mbps)</th>
+                        <th>RSSI (dBm)</th>
+                        <th>Last Downlink (KB)</th>
+                        <th>Last Uplink (KB)</th>
+                        <th>IP</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${clients
+                        .map(
+                          (c) => `
+                        <tr>
+                          <td>${esc(c.mac.toLowerCase())}</td>
+                          <td>${esc(c.medium)}</td>
+                          <td>${esc(c.speed)}</td>
+                          <td>${esc(c.rssi)}</td>
+                          <td>${esc(c.dl)}</td>
+                          <td>${esc(c.ul)}</td>
+                          <td>${esc(c.ip)}</td>
+                        </tr>`
+                        )
+                        .join("")}
+                    </tbody>
+                  </table>`
+                      : ""
+                  }
+                </div>
+              </div>`
                 : ""
             }
           </div>
@@ -923,10 +1024,31 @@
     },
     bind: function () {
       const self = this;
-      document.getElementById("topo-tab-basic").addEventListener("click", function () {
-        window.RouterApp.navigate("wifi-mesh");
+      const ctrlNode = document.getElementById("topo-node-ctrl");
+      if (ctrlNode) {
+        ctrlNode.addEventListener("click", function () {
+          self.selectedNode = "controller";
+          self.showTable = true;
+          window.RouterApp.renderCurrentPage();
+        });
+      }
+      const agentNode = document.getElementById("topo-node-agent");
+      if (agentNode) {
+        agentNode.addEventListener("click", function () {
+          self.selectedNode = "agent";
+          self.showTable = true;
+          window.RouterApp.renderCurrentPage();
+        });
+      }
+      document.querySelectorAll(".topo-acc-hdr").forEach(function (hdr) {
+        hdr.addEventListener("click", function () {
+          const sec = hdr.getAttribute("data-sec");
+          self.openSections[sec] = !self.openSections[sec];
+          window.RouterApp.renderCurrentPage();
+        });
       });
       document.getElementById("topo-reset-view").addEventListener("click", function () {
+        self.selectedNode = "controller";
         window.RouterApp.renderCurrentPage();
       });
       document.getElementById("topo-close-table").addEventListener("click", function () {
@@ -934,14 +1056,14 @@
         window.RouterApp.renderCurrentPage();
       });
       document.getElementById("topo-save").addEventListener("click", function () {
+        window.SimState.mesh.demoAgentConnected = true;
+        window.SimEngine.saveState();
         window.RouterApp.showToast("Đã lưu thông tin Runtime Topology!");
+        window.RouterApp.renderCurrentPage();
       });
       document.getElementById("topo-clear").addEventListener("click", function () {
         window.SimState.mesh.demoAgentConnected = false;
-        window.RouterApp.renderCurrentPage();
-      });
-      document.getElementById("topo-toggle-agent").addEventListener("click", function () {
-        window.SimState.mesh.demoAgentConnected = !window.SimState.mesh.demoAgentConnected;
+        self.selectedNode = "controller";
         window.SimEngine.saveState();
         window.RouterApp.renderCurrentPage();
       });

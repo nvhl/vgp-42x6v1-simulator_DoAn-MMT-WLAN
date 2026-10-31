@@ -193,7 +193,7 @@
         chanUtil24: 80,
         chanUtil5: 85,
         showAdvancedPage: false,
-        demoAgentConnected: false
+        demoAgentConnected: true
       },
       security: {
         spiEnabled: true,

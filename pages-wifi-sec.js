@@ -606,35 +606,37 @@
 
   // --------------------------------------------------------------------------
   // 9. Wi-Fi -> Wi-Fi Mesh (/cgi-bin/wifi-mesh.asp & wifi-mesh-advanced.asp)
-  //    Sub-tabs: Cơ bản | Nâng cao | Trạng thái
+  //    Sub-tabs inside widget: Cơ bản | Nâng cao (Trạng thái has d-none in firmware)
   // --------------------------------------------------------------------------
   window.RouterPages["wifi-mesh"] = {
     title: "",
     group: "Wi-Fi",
     cgi: "/cgi-bin/wifi-mesh.asp",
+    steeringMode: "Indoor",
     render: function () {
       const m = window.SimState.mesh;
       const isAdv = !!m.showAdvancedPage;
       this.cgi = isAdv ? "/cgi-bin/wifi-mesh-advanced.asp" : "/cgi-bin/wifi-mesh.asp";
+      const sMode = this.steeringMode || "Indoor";
+      const isReadonlySteer = sMode !== "Custom";
 
       return `
-        <div class="vht-subtabs">
-          <span class="vht-subtab ${!isAdv ? "active" : ""}" id="mesh-tab-basic">Cơ bản</span>
-          <span class="vht-subtab ${isAdv ? "active" : ""}" id="mesh-tab-adv">Nâng cao</span>
-          <span class="vht-subtab" id="mesh-tab-topo">Trạng thái</span>
-        </div>
+        <div class="vht-card">
+          <div class="vht-subtabs" style="margin-top:0;">
+            <button type="button" class="vht-subtab ${!isAdv ? "active" : ""}" id="mesh-tab-basic">Cơ bản</button>
+            <button type="button" class="vht-subtab ${isAdv ? "active" : ""}" id="mesh-tab-adv">Nâng cao</button>
+          </div>
 
-        ${
-          !isAdv
-            ? `
-          <div class="vht-card">
-            <div class="vht-card-body">
+          <div class="vht-card-body">
+            ${
+              !isAdv
+                ? `
               <table class="form-table">
                 <tr>
                   <th>EasyMesh</th>
                   <td>${switchHtml("mesh-enable", m.enabled)}</td>
                 </tr>
-                <tr>
+                <tr id="mesh-role-row" style="display:${m.enabled ? "" : "none"};">
                   <th>Đặt vai trò thiết bị là</th>
                   <td>
                     <select class="vht-select" id="mesh-role">
@@ -643,87 +645,72 @@
                     </select>
                   </td>
                 </tr>
-                <tr>
+                <tr id="mesh-currole-row" style="display:${m.enabled ? "" : "none"};">
                   <th>Vai trò thiết bị hiện tại</th>
                   <td><strong>${esc(m.role)}</strong></td>
                 </tr>
-                <tr>
+                <tr id="mesh-bh-row" style="display:${m.enabled && m.role === "Agent" ? "" : "none"};">
                   <th>Trạng thái kết nối backhaul</th>
-                  <td><strong>${m.demoAgentConnected ? "Đã kết nối" : "Ngắt kết nối"}</strong></td>
-                </tr>
-                <tr>
-                  <th>Steering</th>
-                  <td>${switchHtml("mesh-steering", m.steering)}</td>
-                </tr>
-                <tr>
-                  <th>Đặt lại cài đặt EasyMesh về mặc định</th>
-                  <td>
-                    <button type="button" class="btn-vht outline small" id="mesh-reset-def">Đặt lại</button>
-                  </td>
-                </tr>
-                <tr>
-                  <th style="vertical-align:top;">EasyMesh On-boarding</th>
-                  <td>
-                    <button type="button" class="btn-vht outline small" id="mesh-onboarding">Kích hoạt Wi-Fi On-boarding</button>
-                    <div class="field-hint" style="margin-left:0;margin-top:4px;font-style:italic;">(Wi-Fi sẽ tự động chọn băng tần backhaul)</div>
-                  </td>
+                  <td><strong>${m.demoAgentConnected ? "5G" : "Ngắt kết nối"}</strong></td>
                 </tr>
               </table>
 
               <div class="btn-row center">
                 <button type="button" class="btn-vht" id="mesh-btn-apply">ÁP DỤNG</button>
-              </div>
-            </div>
-          </div>`
-            : `
-          <div class="vht-card">
-            <div class="vht-card-body">
-              <div class="sub-heading" style="margin-top:0;">Chuyển vùng</div>
-              <table class="form-table">
+              </div>`
+                : `
+              <legend class="vht-legend" style="margin-top:0;">Chuyển vùng</legend>
+              <table class="form-table" style="margin-bottom:16px;">
                 <tr>
                   <th>Ngưỡng AP chuyển vùng RSSI</th>
                   <td>
-                    <input type="number" class="vht-input short" id="mesh-roam" value="${m.roamRssi}" />
+                    <input type="text" class="vht-input short" id="mesh-roam" value="${m.roamRssi}" />
                     <span class="field-hint">[-90 đến 0] (dBm)</span>
                   </td>
                 </tr>
               </table>
 
-              <div class="sub-heading">Chuyển băng tần</div>
-              <table class="form-table">
+              <legend class="vht-legend">Chuyển băng tần</legend>
+              <table class="form-table" style="margin-bottom:16px;">
                 <tr>
                   <th>Chế độ chuyển băng tần</th>
-                  <td>${switchHtml("mesh-band-steer", true)}</td>
+                  <td>
+                    <select class="vht-select" id="mesh-steer-mode">
+                      <option value="Indoor" ${sMode === "Indoor" ? "selected" : ""}>Trong nhà</option>
+                      <option value="Outdoor" ${sMode === "Outdoor" ? "selected" : ""}>Ngoài trời</option>
+                      <option value="Custom" ${sMode === "Custom" ? "selected" : ""}>Tùy chỉnh</option>
+                    </select>
+                  </td>
                 </tr>
                 <tr>
                   <th>Ngưỡng RSSI chuyển băng tần từ 5G xuống 2.4G</th>
                   <td>
-                    <input type="number" class="vht-input short" id="mesh-5to24" value="${m.band5To24Rssi}" />
+                    <input type="text" class="vht-input short" id="mesh-5to24" value="${m.band5To24Rssi}" ${isReadonlySteer ? "readonly" : ""} style="${isReadonlySteer ? "background:#f1f5f9;" : ""}" />
                     <span class="field-hint">[-91 đến -50] (dBm)</span>
                   </td>
                 </tr>
                 <tr>
-                  <th>Ngưỡng RSSI chuyển băng tần từ 2.4G lên 5G</th>
+                  <th>Ngưỡng RSSI chuyển bẳng tần từ 2.4G lên 5G</th>
                   <td>
-                    <input type="number" class="vht-input short" id="mesh-24to5" value="${m.band24To5Rssi}" />
+                    <input type="text" class="vht-input short" id="mesh-24to5" value="${m.band24To5Rssi}" ${isReadonlySteer ? "readonly" : ""} style="${isReadonlySteer ? "background:#f1f5f9;" : ""}" />
                     <span class="field-hint">[-91 đến -50] (dBm)</span>
                   </td>
                 </tr>
               </table>
 
-              <div class="sub-heading">Cân bằng tải</div>
+              <legend class="vht-legend">Cân bằng tải</legend>
               <table class="form-table">
                 <tr>
                   <th>Độ hữu dụng của kênh 2.4G</th>
                   <td>
-                    <input type="number" class="vht-input short" id="mesh-cu24" value="${m.chanUtil24}" />
+                    <input type="text" class="vht-input short" id="mesh-cu24" value="${m.chanUtil24}" />
                     <span class="field-hint">(0~100%)</span>
                   </td>
                 </tr>
                 <tr>
                   <th>Độ hữu dụng của kênh 5G</th>
                   <td>
-                    <input type="number" class="vht-input short" id="mesh-cu5" value="${m.chanUtil5}" />
+                    <input type="text" class="vht-input short" id="mesh-cu5" value="${m.chanUtil5}" />
                     <span class="field-hint">(0~100%)</span>
                   </td>
                 </tr>
@@ -731,13 +718,14 @@
 
               <div class="btn-row center">
                 <button type="button" class="btn-vht" id="mesh-adv-apply">ÁP DỤNG</button>
-              </div>
-            </div>
-          </div>`
-        }
+              </div>`
+            }
+          </div>
+        </div>
       `;
     },
     bind: function () {
+      const self = this;
       const m = window.SimState.mesh;
 
       document.getElementById("mesh-tab-basic").addEventListener("click", function () {
@@ -752,43 +740,63 @@
         window.RouterApp.renderCurrentPage();
       });
 
-      document.getElementById("mesh-tab-topo").addEventListener("click", function () {
-        window.RouterApp.navigate("wifi-mesh-topology");
-      });
-
       if (!m.showAdvancedPage) {
-        document.getElementById("mesh-reset-def").addEventListener("click", function () {
-          m.enabled = true;
-          m.role = "Controller";
-          m.steering = true;
-          window.SimEngine.saveState();
-          window.RouterApp.showToast("Đã đặt lại cài đặt EasyMesh về mặc định!");
-          window.RouterApp.renderCurrentPage();
+        const enSw = document.getElementById("mesh-enable");
+        const roleSel = document.getElementById("mesh-role");
+        enSw.addEventListener("change", function () {
+          document.getElementById("mesh-role-row").style.display = enSw.checked ? "" : "none";
+          document.getElementById("mesh-currole-row").style.display = enSw.checked ? "" : "none";
+          document.getElementById("mesh-bh-row").style.display = enSw.checked && roleSel.value === "Agent" ? "" : "none";
         });
-
-        document.getElementById("mesh-onboarding").addEventListener("click", function () {
-          window.SimState.device.wpsBlinkUntil = Date.now() + 120000;
-          m.demoAgentConnected = true;
-          window.SimEngine.addLog("[EASYMESH] Kích hoạt Wi-Fi On-boarding — Đã ghép nối Node Agent.");
-          window.RouterApp.showToast("Đã kích hoạt Wi-Fi On-boarding (Đèn WPS chớp xanh)!");
-          window.RouterApp.renderCurrentPage();
-          window.LabUI.render();
+        roleSel.addEventListener("change", function () {
+          document.getElementById("mesh-bh-row").style.display = enSw.checked && roleSel.value === "Agent" ? "" : "none";
         });
 
         document.getElementById("mesh-btn-apply").addEventListener("click", function () {
-          m.enabled = document.getElementById("mesh-enable").checked;
-          m.role = document.getElementById("mesh-role").value;
-          m.steering = document.getElementById("mesh-steering").checked;
+          m.enabled = enSw.checked;
+          m.role = roleSel.value;
           window.SimEngine.addLog("[EASYMESH] Cập nhật vai trò: " + m.role + " (EasyMesh: " + (m.enabled ? "Bật" : "Tắt") + ").");
           window.RouterApp.applyWithFeedback("Đã lưu cấu hình Wi-Fi Mesh!");
         });
       } else {
+        const modeSel = document.getElementById("mesh-steer-mode");
+        modeSel.addEventListener("change", function () {
+          self.steeringMode = modeSel.value;
+          if (modeSel.value === "Indoor") {
+            m.band5To24Rssi = -82;
+            m.band24To5Rssi = -65;
+          } else if (modeSel.value === "Outdoor") {
+            m.band5To24Rssi = -91;
+            m.band24To5Rssi = -65;
+          }
+          window.RouterApp.renderCurrentPage();
+        });
+
         document.getElementById("mesh-adv-apply").addEventListener("click", function () {
-          m.roamRssi = parseInt(document.getElementById("mesh-roam").value, 10) || -70;
-          m.band5To24Rssi = parseInt(document.getElementById("mesh-5to24").value, 10) || -82;
-          m.band24To5Rssi = parseInt(document.getElementById("mesh-24to5").value, 10) || -65;
-          m.chanUtil24 = parseInt(document.getElementById("mesh-cu24").value, 10) || 80;
-          m.chanUtil5 = parseInt(document.getElementById("mesh-cu5").value, 10) || 80;
+          const roam = parseInt(document.getElementById("mesh-roam").value, 10);
+          const dg = parseInt(document.getElementById("mesh-5to24").value, 10);
+          const ug = parseInt(document.getElementById("mesh-24to5").value, 10);
+          const cu24 = parseInt(document.getElementById("mesh-cu24").value, 10);
+          const cu5 = parseInt(document.getElementById("mesh-cu5").value, 10);
+
+          if (isNaN(roam) || roam < -90 || roam > 0) {
+            return alert("Ngưỡng RSSI không đúng!\nXin hãy nhập một số nằm giữa -90 đến 0.");
+          }
+          if (isNaN(dg) || dg < -91 || dg > -50 || isNaN(ug) || ug < -91 || ug > -50) {
+            return alert("Ngưỡng RSSI không đúng!\nXin hãy nhập một số nằm giữa -91 đến -50.");
+          }
+          if (ug - dg < 10) {
+            return alert("Ngưỡng RSSI không đúng!\nNgưỡng RSSI để chuyển sang 5G phải cao hơn ít nhất 10 dBm so với ngưỡng để chuyển sang 2.4G");
+          }
+          if (isNaN(cu24) || cu24 <= 0 || cu24 >= 100 || isNaN(cu5) || cu5 <= 0 || cu5 >= 100) {
+            return alert("Độ hữu dụng của kênh phải là số nguyên từ 1 đến 99");
+          }
+
+          m.roamRssi = roam;
+          m.band5To24Rssi = dg;
+          m.band24To5Rssi = ug;
+          m.chanUtil24 = cu24;
+          m.chanUtil5 = cu5;
           window.SimEngine.addLog("[EASYMESH ADV] Cập nhật ngưỡng RSSI chuyển vùng & chuyển băng tần.");
           window.RouterApp.applyWithFeedback("Đã lưu cấu hình Wi-Fi Mesh Nâng cao!");
         });
